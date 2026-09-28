@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeoBook Web IDE & Interactive Runtime</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace']
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Custom UI Scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.05); }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.3); }
+
+        /* Canvas & Handles styling */
+        .canvas-bg-grid {
+            background-size: 20px 20px;
+            background-image: 
+                linear-gradient(to right, rgba(0,0,0,0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(0,0,0,0.05) 1px, transparent 1px);
+        }
+        .dark .canvas-bg-grid {
+            background-image: 
+                linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+        }
+
+        /* Resize Handles */
+        .resize-handle {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #0284c7;
+            border: 1px solid white;
+            border-radius: 2px;
+            z-index: 30;
+        }
+        @media (max-width: 768px) {
+            .resize-handle {
+                width: 16px;
+                height: 16px;
+            }
+        }
+
+        /* Page Transition Animations */
+        .page-transition { transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1); }
+        .trans-fade-enter { opacity: 0; }
+        .trans-fade-active { opacity: 1; }
+        .trans-slide-left-enter { transform: translateX(100%); }
+        .trans-slide-left-active { transform: translateX(0); }
+        .trans-slide-right-enter { transform: translateX(-100%); }
+        .trans-slide-right-active { transform: translateX(0); }
+        .trans-zoom-enter { transform: scale(0.7); opacity: 0; }
+        .trans-zoom-active { transform: scale(1); opacity: 1; }
+
+        /* Touch interaction optimizations */
+        .touch-action-none { touch-action: none; }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 font-sans h-screen w-screen overflow-hidden flex flex-col">
+
+    <!-- TOP TOOLBAR -->
+    <header class="h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-3 z-20 flex-shrink-0 select-none">
+        <div class="flex items-center space-x-3">
+            <!-- Mobile Menu Toggles -->
+            <button id="btn-toggle-left-drawer" class="md:hidden p-2 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                <i class="fa-solid fa-bars text-lg"></i>
+            </button>
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center text-white font-bold shadow">
+                    <i class="fa-solid fa-book-open text-sm"></i>
+                </div>
+                <span class="font-bold text-lg hidden sm:inline bg-gradient-to-r from-brand-600 to-indigo-600 bg-clip-text text-transparent">NeoBook IDE</span>
+            </div>
+            
+            <div class="h-5 w-px bg-gray-300 dark:bg-gray-600 mx-1"></div>
+
+            <!-- Global Action Controls -->
+            <div class="flex items-center space-x-1">
+                <button onclick="createNewProject()" title="New Project" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
+                    <i class="fa-solid fa-file"></i>
+                </button>
+                <button onclick="triggerImportProject()" title="Open Project" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
+                    <i class="fa-solid fa-folder-open"></i>
+                </button>
+                <input type="file" id="file-input-import" accept=".json,.pub,image/*" multiple class="hidden" onchange="importProject(event)">
+                <button onclick="exportProject()" title="Save Project (.json)" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
+                    <i class="fa-solid fa-floppy-disk"></i>
+                </button>
+                <button onclick="exportStandaloneHTML()" title="Export App (Standalone HTML)" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-brand-600 dark:text-brand-400 font-medium text-xs flex items-center space-x-1">
+                    <i class="fa-solid fa-file-code text-sm"></i>
+                    <span class="hidden md:inline">Export Web App</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas Dimensions & Zoom Controls -->
+        <div class="hidden lg:flex items-center space-x-3 text-xs bg-gray-50 dark:bg-gray-900 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700">
+            <span class="font-semibold text-gray-500">Preset:</span>
+            <select id="select-res-preset" onchange="changeCanvasPreset(this.value)" class="bg-transparent border-none text-xs font-medium focus:ring-0 cursor-pointer">
+                <option value="800x600">800 x 600 (4:3 Classic)</option>
+                <option value="1024x768">1024 x 768 (XGA)</option>
+                <option value="1280x720">1280 x 720 (16:9 HD)</option>
+                <option value="375x667">375 x 667 (Mobile Portrait)</option>
+                <option value="custom">Custom Dimensions</option>
+            </select>
+            <div class="h-3 w-px bg-gray-300 dark:bg-gray-700"></div>
+            <label class="flex items-center space-x-1 cursor-pointer">
+                <input type="checkbox" id="chk-snap-grid" checked onchange="toggleSnapGrid(this.checked)" class="rounded text-brand-600 focus:ring-brand-500">
+                <span>Snap Grid</span>
+            </label>
+        </div>
+
+        <!-- Right Header Actions (Preview / Run) -->
+        <div class="flex items-center space-x-2">
+            <button onclick="openPlugins()" title="Plugins" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"><i class="fa-solid fa-puzzle-piece"></i></button>
+            <button onclick="toggleDarkMode()" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300">
+                <i id="dark-icon" class="fa-solid fa-moon"></i>
+            </button>
+            
+            <button onclick="runPublication()" class="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold shadow-md flex items-center space-x-2 transition active:scale-95">
+                <i class="fa-solid fa-play text-xs"></i>
+                <span>Run / Test</span>
+            </button>
+
+            <button id="btn-toggle-right-drawer" class="md:hidden p-2 rounded text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                <i class="fa-solid fa-sliders text-lg"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- MAIN WORKSPACE -->
+    <div class="flex-1 flex relative overflow-hidden">
+
+        <!-- LEFT DRAWER / PANEL: Tools & Pages -->
+        <aside id="panel-left" class="absolute md:relative z-10 w-64 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col transition-transform duration-300 -translate-x-full md:translate-x-0 shadow-lg md:shadow-none">
+            
+            <!-- Tool Palette Header -->
+            <div class="p-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-xs text-gray-500 uppercase tracking-wider flex justify-between items-center">
+                <span>Component Toolbox</span>
+                <i class="fa-solid fa-cubes"></i>
+            </div>
+
+            <!-- Controls Grid Palette -->
+            <div class="p-3 grid grid-cols-2 gap-2 border-b border-gray-200 dark:border-gray-700 overflow-y-auto max-h-56">
+                <button onclick="addNewElement('text')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                    <i class="fa-solid fa-font text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
+                    <span class="text-xs font-medium">Text / Label</span>
+                </button>
+                <button onclick="addNewElement('button')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                    <i class="fa-solid fa-rectangle-ad text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
+                    <span class="text-xs font-medium">Button</span>
+                </button>
+                <button onclick="addNewElement('input')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                    <i class="fa-solid fa-i-cursor text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
+                    <span class="text-xs font-medium">Text Field</span>
+                </button>
+                <button onclick="addNewElement('image')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                    <i class="fa-solid fa-image text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
+                    <span class="text-xs font-medium">Image</span>
+                </button>
+                <button onclick="addNewElement('checkbox')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                    <i class="fa-solid fa-square-check text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
+                    <span class="text-xs font-medium">Checkbox</span>
+                </button>
+                <button onclick="addNewElement('media')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                    <i class="fa-solid fa-film text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
+                    <span class="text-xs font-medium">Media Player</span>
+                </button>
+                <button onclick="addNewElement('shape')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                    <i class="fa-solid fa-shapes text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
+                    <span class="text-xs font-medium">Shape</span>
+                </button>
+                <button onclick="addNewElement('radio')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg flex flex-col items-center space-y-1"><i class="fa-regular fa-circle-dot text-brand-600"></i><span class="text-xs font-medium">Radio</span></button>
+                <button onclick="addNewElement('webview')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg flex flex-col items-center space-y-1"><i class="fa-solid fa-globe text-brand-600"></i><span class="text-xs font-medium">WebView</span></button>
+                <button onclick="addNewElement('dropdown')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                    <i class="fa-solid fa-caret-down text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
+                    <span class="text-xs font-medium">Dropdown</span>
+                </button>
+            </div>
+
+            <!-- Page Management Panel -->
+            <div class="flex-1 flex flex-col min-h-0">
+                <div class="p-3 border-b border-gray-200 dark:border-gray-700 font-semibold text-xs text-gray-500 uppercase tracking-wider flex justify-between items-center">
+                    <span>Publication Pages</span>
+                    <button onclick="addPage()" title="Add Page" class="text-brand-600 dark:text-brand-400 hover:text-brand-700 p-1">
+                        <i class="fa-solid fa-plus text-sm"></i>
+                    </button>
+                </div>
+                <div id="pages-list" class="flex-1 overflow-y-auto p-2 space-y-1">
+                    <!-- Page Items rendered dynamically -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- CENTER CANVAS WORKSPACE -->
+        <main class="flex-1 bg-gray-200 dark:bg-gray-950 flex flex-col relative overflow-hidden">
+            <!-- Canvas Toolbar / Navigation Bar -->
+            <div class="h-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 z-10 flex-shrink-0">
+                <div class="flex items-center space-x-2">
+                    <span id="label-current-page" class="font-bold text-xs text-gray-600 dark:text-gray-300">Page: New Page</span>
+                    <button onclick="openScriptEditorForCurrentPage()" class="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded text-gray-700 dark:text-gray-200">
+                        <i class="fa-solid fa-code text-xs mr-1"></i>Page Script
+                    </button>
+                </div>
+
+                <!-- Element Layer & Quick Action Bar -->
+                <div id="quick-element-actions" class="hidden items-center space-x-1 text-xs">
+                    <button onclick="arrangeElement('front')" title="Bring to Front" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"><i class="fa-solid fa-layer-group"></i></button>
+                    <button onclick="arrangeElement('back')" title="Send to Back" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"><i class="fa-solid fa-layer-group fa-flip-vertical"></i></button>
+                    <button onclick="duplicateSelectedElement()" title="Duplicate" class="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"><i class="fa-solid fa-copy"></i></button>
+                    <button onclick="deleteSelectedElement()" title="Delete" class="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"><i class="fa-solid fa-trash"></i></button>
+                </div>
+
+                <!-- Zoom Level -->
+                <div class="flex items-center space-x-2 text-xs text-gray-500">
+                    <button onclick="setZoom(zoomLevel - 0.1)" class="hover:text-gray-700 dark:hover:text-white"><i class="fa-solid fa-minus"></i></button>
+                    <span id="label-zoom">100%</span>
+                    <button onclick="setZoom(zoomLevel + 0.1)" class="hover:text-gray-700 dark:hover:text-white"><i class="fa-solid fa-plus"></i></button>
+                </div>
+            </div>
+
+            <!-- Scrollable Canvas Container -->
+            <div id="canvas-container" class="flex-1 overflow-auto p-8 flex items-center justify-center relative touch-action-none">
+                <!-- Outer Screen Frame -->
+                <div id="canvas-frame" class="bg-white dark:bg-gray-800 shadow-2xl relative canvas-bg-grid transition-all duration-150 rounded border border-gray-300 dark:border-gray-700 overflow-hidden" style="width: 800px; height: 600px;">
+                    <!-- Interactive Canvas Layers -->
+                    <div id="canvas-elements" class="w-full h-full relative">
+                        <!-- Dynamic NeoBook Controls Rendered Here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- RIGHT DRAWER / PANEL: Properties & Variable Inspector -->
+        <aside id="panel-right" class="absolute right-0 md:relative z-10 w-72 h-full bg-white dark:bg-gray-800 border-l border-gray-200 dark:border-gray-700 flex flex-col transition-transform duration-300 translate-x-full md:translate-x-0 shadow-lg md:shadow-none">
+            
+            <!-- Panel Tabs -->
+            <div class="flex border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                <button id="tab-btn-props" onclick="switchRightTab('props')" class="flex-1 py-2.5 text-xs font-semibold text-brand-600 border-b-2 border-brand-600 flex items-center justify-center space-x-1">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>Properties</span>
+                </button>
+                <button id="tab-btn-vars" onclick="switchRightTab('vars')" class="flex-1 py-2.5 text-xs font-semibold text-gray-500 border-b-2 border-transparent hover:text-gray-700 flex items-center justify-center space-x-1">
+                    <i class="fa-solid fa-code-branch"></i>
+                    <span>Variables</span>
+                </button>
+            </div>
+
+            <!-- Tab Content: Properties Panel -->
+            <div id="tab-content-props" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <div id="no-selection-msg" class="text-center py-8 text-gray-400 text-sm">
+                    <i class="fa-solid fa-arrow-pointer text-3xl mb-2 block"></i>
+                    Select an element on canvas to edit properties.
+                </div>
+
+                <div id="properties-form" class="hidden space-y-4 text-xs">
+                    <div class="flex items-center justify-between border-b pb-2 dark:border-gray-700">
+                        <span class="font-bold text-sm" id="prop-elem-type">Control</span>
+                        <span class="text-gray-400 text-xs" id="prop-elem-id">#id</span>
+                    </div>
+
+                    <!-- General Properties -->
+                    <div class="space-y-2">
+                        <label class="block font-medium">Element Name / ID</label>
+                        <input type="text" id="prop-name" onchange="updateSelectedElementProp('name', this.value)" class="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:border-brand-500">
+                    </div>
+
+                    <div id="prop-text-container" class="space-y-2">
+                        <label class="block font-medium">Text Content / Value</label>
+                        <textarea id="prop-text" rows="2" oninput="updateSelectedElementProp('text', this.value)" class="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:border-brand-500"></textarea>
+                    </div>
+
+                    <!-- Variable Binding -->
+                    <div id="prop-var-container" class="space-y-2">
+                        <label class="block font-medium">Bound Variable (e.g. [Input1])</label>
+                        <input type="text" id="prop-variable" placeholder="[VarName]" onchange="updateSelectedElementProp('variable', this.value)" class="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:border-brand-500 font-mono">
+                    </div>
+
+                    <!-- Layout Dimensions & Position -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block font-medium text-gray-500">X Position</label>
+                            <input type="number" id="prop-x" onchange="updateSelectedElementProp('x', parseInt(this.value))" class="w-full px-2 py-1 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-500">Y Position</label>
+                            <input type="number" id="prop-y" onchange="updateSelectedElementProp('y', parseInt(this.value))" class="w-full px-2 py-1 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-500">Width</label>
+                            <input type="number" id="prop-w" onchange="updateSelectedElementProp('w', parseInt(this.value))" class="w-full px-2 py-1 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700">
+                        </div>
+                        <div>
+                            <label class="block font-medium text-gray-500">Height</label>
+                            <input type="number" id="prop-h" onchange="updateSelectedElementProp('h', parseInt(this.value))" class="w-full px-2 py-1 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700">
+                        </div>
+                    </div>
+
+                    <!-- Typography & Appearance -->
+                    <div class="space-y-2 border-t pt-2 dark:border-gray-700">
+                        <label class="block font-medium">Typography & Style</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <span class="text-gray-400 block mb-1">Text Color</span>
+                                <input type="color" id="prop-color" onchange="updateSelectedElementProp('color', this.value)" class="w-full h-8 rounded border dark:border-gray-600 p-0 cursor-pointer">
+                            </div>
+                            <div>
+                                <span class="text-gray-400 block mb-1">Background</span>
+                                <input type="color" id="prop-bg" onchange="updateSelectedElementProp('bg', this.value)" class="w-full h-8 rounded border dark:border-gray-600 p-0 cursor-pointer">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mt-2">
+                            <div>
+                                <span class="text-gray-400 block mb-1">Font Size</span>
+                                <input type="number" id="prop-font-size" onchange="updateSelectedElementProp('fontSize', parseInt(this.value))" class="w-full px-2 py-1 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700">
+                            </div>
+                            <div>
+                                <span class="text-gray-400 block mb-1">Align</span>
+                                <select id="prop-align" onchange="updateSelectedElementProp('align', this.value)" class="w-full px-2 py-1 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700">
+                                    <option value="left">Left</option>
+                                    <option value="center">Center</option>
+                                    <option value="right">Right</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Trigger Button -->
+                    <div class="border-t pt-3 dark:border-gray-700">
+                        <button onclick="openScriptEditorForSelectedElement()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow transition flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-bolt"></i>
+                            <span>Edit NeoScript Actions</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content: Variables Inspector -->
+            <div id="tab-content-vars" class="hidden flex-1 flex-col p-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="font-bold text-xs uppercase text-gray-500">Live Variables</span>
+                    <button onclick="addNewVariablePrompt()" class="text-xs text-brand-600 hover:underline flex items-center space-x-1">
+                        <i class="fa-solid fa-plus"></i><span>Add Var</span>
+                    </button>
+                </div>
+                <div id="variables-list" class="flex-1 overflow-y-auto space-y-2 border border-gray-200 dark:border-gray-700 rounded-lg p-2 bg-gray-50 dark:bg-gray-900/50">
+                    <!-- Dynamic Variables List -->
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- MODAL: NEOSCRIPT ACTION BUILDER & EDITOR -->
+    <div id="modal-script-editor" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col h-[520px]">
+            <!-- Header -->
+            <div class="px-5 py-3 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-code text-brand-600 dark:text-brand-400"></i>
+                    <h3 class="font-bold text-base" id="script-modal-title">NeoScript Action Editor</h3>
+                </div>
+                <button onclick="closeScriptEditor()" class="text-gray-400 hover:text-gray-600 dark:hover:text-white">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Editor Body -->
+            <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+                <!-- Action Helper Buttons Side Menu -->
+                <div class="w-full md:w-48 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 p-2 overflow-y-auto space-y-1 text-xs">
+                    <div class="font-semibold text-gray-400 px-2 py-1">Insert Command</div>
+                    <button onclick="insertScriptCommand('GotoPage')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">GotoPage</button>
+                    <button onclick="insertScriptCommand('SetVar')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">SetVar</button>
+                    <button onclick="insertScriptCommand('Alert')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">Alert / Msg</button>
+                    <button onclick="insertScriptCommand('ShowObject')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">ShowObject</button>
+                    <button onclick="insertScriptCommand('HideObject')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">HideObject</button>
+                    <button onclick="insertScriptCommand('PlayAudio')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">PlayAudio</button>
+                    <button onclick="insertScriptCommand('If')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">If ... EndIf</button>
+                </div>
+
+                <!-- Code Input Textarea -->
+                <div class="flex-1 flex flex-col p-3 bg-gray-900 font-mono">
+                    <textarea id="script-code-input" class="w-full flex-1 bg-transparent text-green-400 focus:outline-none resize-none text-xs leading-relaxed" placeholder="Enter NeoScript commands here..."></textarea>
+                </div>
+            </div>
+
+            <!-- Footer Controls -->
+            <div class="px-5 py-3 bg-gray-100 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 flex justify-end space-x-3">
+                <button onclick="closeScriptEditor()" class="px-4 py-2 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600">Cancel</button>
+                <button onclick="saveScriptCode()" class="px-4 py-2 rounded-lg text-xs font-medium bg-brand-600 hover:bg-brand-700 text-white shadow">Save Script</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVERLAY: LIVE PUBLICATION PLAYER OVERLAY -->
+    <div id="player-overlay" class="fixed inset-0 bg-black z-50 hidden flex flex-col items-center justify-center">
+        <!-- Close Player Control -->
+        <button onclick="stopPublication()" class="absolute top-4 right-4 z-50 px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-full shadow-lg hover:bg-red-700 flex items-center space-x-2">
+            <i class="fa-solid fa-xmark"></i>
+            <span>Exit Preview</span>
+        </button>
+
+        <!-- Dynamic Runtime Container -->
+        <div id="player-viewport" class="relative bg-white shadow-2xl overflow-hidden transition-all duration-300">
+            <!-- Pages rendered dynamically during runtime preview -->
+        </div>
+    </div>
+
+    <dialog id="dlg-plugins" class="rounded-lg p-4 w-[min(560px,94vw)] bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border border-gray-300 dark:border-gray-600">
+        <h3 class="font-bold mb-2">Plugins (JavaScript)</h3>
+        <p class="text-xs text-gray-500 mb-2">例：<code>NeoPlugins.register({actions:{shout:(a,c)=>alert(a[0].toUpperCase())},controls:{clock:(el)=>{el.textContent=new Date().toLocaleTimeString()}}})</code>。之後腳本可用 <code>Shout "hi"</code>，物件類型 <code>clock</code> 可從下方按鈕加入。僅載入你信任的程式碼。</p>
+        <textarea id="plugin-code" rows="8" class="w-full font-mono text-xs p-2 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-900"></textarea>
+        <div id="plugin-controls" class="flex flex-wrap gap-1 my-2 text-xs"></div>
+        <div class="flex justify-end gap-2"><button onclick="addPluginFromDialog()" class="px-3 py-1 bg-brand-600 text-white rounded text-sm">載入</button><button onclick="this.closest('dialog').close()" class="px-3 py-1 border rounded text-sm">關閉</button></div>
+    </dialog>
+    <script>
+        /* ==========================================================================
+           1. CORE STATE MANAGEMENT & INITIALIZATION
+           ========================================================================== */
+        let project = {
+            title: "New NeoBook Project",
+            width: 800,
+            height: 600,
+            pages: [
+                {
+                    id: "page_1",
+                    name: "Page 1",
+                    background: "#ffffff",
+                    script: "",
+                    transition: "fade",
+                    elements: []
+                }
+            ],
+            variables: {
+                "[UserName]": "Guest",
+                "[Score]": "0"
+            }
+        };
+
+        let activePageId = "page_1";
+        let selectedElementId = null;
+        let zoomLevel = 1.0;
+        let snapToGrid = true;
+        let activeScriptTarget = null; // { type: 'page'|'element', id: string }
+
+        // Interaction state variables for drag & resize
+        let isDragging = false;
+        let isResizing = false;
+        let resizeHandleType = null;
+        let dragStartX = 0, dragStartY = 0;
+        let initialElemPos = { x: 0, y: 0, w: 0, h: 0 };
+
+        function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        let _uid = 0;
+        const uid = p => p + '_' + Date.now().toString(36) + (_uid++).toString(36);
+        try {
+            const s = JSON.parse(localStorage.getItem('neobook_ide_project') || 'null');
+            if (s && Array.isArray(s.pages) && s.pages.length) { project = s; project.variables = project.variables || {}; activePageId = project.pages[0].id; }
+        } catch (e) {}
+        let _last = '';
+        setInterval(() => { try { const s = JSON.stringify(project); if (s !== _last) { localStorage.setItem('neobook_ide_project', s); _last = s; } } catch (e) {} }, 1500);
+
+        window.onload = function() {
+            initDrawers();
+            renderPagesList();
+            renderCanvas();
+            renderVariablesList();
+            setupTouchAndMouseEvents();
+            (project.plugins || []).forEach(loadPlugin);
+            fitZoom();
+            window.addEventListener('resize', fitZoom);
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Escape') stopPublication();
+                if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) || !selectedElementId) return;
+                const el = getCurrentPage().elements.find(x => x.id === selectedElementId);
+                const s = e.shiftKey ? 10 : 1;
+                if (e.key === 'Delete' || e.key === 'Backspace') { deleteSelectedElement(); e.preventDefault(); }
+                else if (el && e.key.startsWith('Arrow')) {
+                    if (e.key === 'ArrowLeft') el.x = Math.max(0, el.x - s); if (e.key === 'ArrowRight') el.x += s;
+                    if (e.key === 'ArrowUp') el.y = Math.max(0, el.y - s); if (e.key === 'ArrowDown') el.y += s;
+                    syncElemStyle(el); updatePropertiesPanel(); e.preventDefault();
+                }
+            });
+        };
+        function openPlugins() {
+            const box = document.getElementById('plugin-controls'); box.innerHTML = '';
+            Object.keys(NeoPlugins.controls).forEach(t => { const b = document.createElement('button'); b.className = 'px-2 py-1 border rounded'; b.textContent = '＋' + t; b.onclick = () => addNewElement(t); box.appendChild(b); });
+            document.getElementById('dlg-plugins').showModal();
+        }
+        function addPluginFromDialog() {
+            const code = document.getElementById('plugin-code').value.trim();
+            if (code && loadPlugin(code)) { (project.plugins ||= []).push(code); document.getElementById('plugin-code').value = ''; openPlugins(); }
+        }
+        function fitZoom() {
+            const c = document.getElementById('canvas-container');
+            setZoom(Math.min(1, (c.clientWidth - 64) / project.width, (c.clientHeight - 64) / project.height));
+        }
+        function syncElemStyle(el) {
+            const d = document.getElementById(`elem-${el.id}`); if (!d) return;
+            d.style.left = el.x + 'px'; d.style.top = el.y + 'px'; d.style.width = el.w + 'px'; d.style.height = el.h + 'px';
+        }
+
+        /* ==========================================================================
+           2. RESPONSIVE UI & DRAWER CONTROLS
+           ========================================================================== */
+        function initDrawers() {
+            const leftDrawer = document.getElementById('panel-left');
+            const rightDrawer = document.getElementById('panel-right');
+            const btnLeft = document.getElementById('btn-toggle-left-drawer');
+            const btnRight = document.getElementById('btn-toggle-right-drawer');
+
+            btnLeft?.addEventListener('click', () => {
+                leftDrawer.classList.toggle('-translate-x-full');
+            });
+            btnRight?.addEventListener('click', () => {
+                rightDrawer.classList.toggle('translate-x-full');
+            });
+        }
+
+        function toggleDarkMode() {
+            document.documentElement.classList.toggle('dark');
+            const icon = document.getElementById('dark-icon');
+            if (document.documentElement.classList.contains('dark')) {
+                icon.className = 'fa-solid fa-sun';
+            } else {
+                icon.className = 'fa-solid fa-moon';
+            }
+        }
+
+        function switchRightTab(tab) {
+            const propBtn = document.getElementById('tab-btn-props');
+            const varBtn = document.getElementById('tab-btn-vars');
+            const propContent = document.getElementById('tab-content-props');
+            const varContent = document.getElementById('tab-content-vars');
+
+            if (tab === 'props') {
+                propBtn.className = "flex-1 py-2.5 text-xs font-semibold text-brand-600 border-b-2 border-brand-600 flex items-center justify-center space-x-1";
+                varBtn.className = "flex-1 py-2.5 text-xs font-semibold text-gray-500 border-b-2 border-transparent hover:text-gray-700 flex items-center justify-center space-x-1";
+                propContent.classList.remove('hidden');
+                varContent.classList.add('hidden');
+                varContent.classList.remove('flex');
+            } else {
+                varBtn.className = "flex-1 py-2.5 text-xs font-semibold text-brand-600 border-b-2 border-brand-600 flex items-center justify-center space-x-1";
+                propBtn.className = "flex-1 py-2.5 text-xs font-semibold text-gray-500 border-b-2 border-transparent hover:text-gray-700 flex items-center justify-center space-x-1";
+                varContent.classList.remove('hidden');
+                varContent.classList.add('flex');
+                propContent.classList.add('hidden');
+            }
+        }
+
+        function changeCanvasPreset(value) {
+            if (value === 'custom') {
+                const w = prompt("Enter canvas width (px):", project.width);
+                const h = prompt("Enter canvas height (px):", project.height);
+                if (w && h) {
+                    project.width = parseInt(w);
+                    project.height = parseInt(h);
+                }
+            } else {
+                const parts = value.split('x');
+                project.width = parseInt(parts[0]);
+                project.height = parseInt(parts[1]);
+            }
+            renderCanvas();
+            fitZoom();
+        }
+
+        function toggleSnapGrid(val) {
+            snapToGrid = val;
+        }
+
+        function setZoom(val) {
+            zoomLevel = Math.max(0.4, Math.min(2.0, val));
+            document.getElementById('label-zoom').innerText = `${Math.round(zoomLevel * 100)}%`;
+            document.getElementById('canvas-frame').style.transform = `scale(${zoomLevel})`;
+        }
+
+        /* ==========================================================================
+           3. PAGE MANAGEMENT LOGIC
+           ========================================================================== */
+        function getCurrentPage() {
+            return project.pages.find(p => p.id === activePageId) || project.pages[0];
+        }
+
+        function renderPagesList() {
+            const list = document.getElementById('pages-list');
+            list.innerHTML = '';
+
+            project.pages.forEach((page, index) => {
+                const isActive = page.id === activePageId;
+                const pageEl = document.createElement('div');
+                pageEl.className = `p-2 rounded-lg flex items-center justify-between text-xs cursor-pointer transition ${
+                    isActive ? 'bg-brand-50 dark:bg-brand-900/40 text-brand-600 dark:text-brand-300 font-semibold border border-brand-300 dark:border-brand-700' : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`;
+                pageEl.onclick = () => switchPage(page.id);
+
+                pageEl.innerHTML = `
+                    <div class="flex items-center space-x-2 truncate">
+                        <i class="fa-solid fa-file-lines text-gray-400"></i>
+                        <span class="truncate">${esc(page.name)}</span>
+                    </div>
+                    <div class="flex items-center space-x-1 opacity-80 hover:opacity-100">
+                        <button onclick="event.stopPropagation(); renamePage('${page.id}')" class="p-1 hover:text-brand-600"><i class="fa-solid fa-pen"></i></button>
+                        ${project.pages.length > 1 ? `<button onclick="event.stopPropagation(); deletePage('${page.id}')" class="p-1 hover:text-red-600"><i class="fa-solid fa-trash"></i></button>` : ''}
+                    </div>
+                `;
+                list.appendChild(pageEl);
+            });
+
+            document.getElementById('label-current-page').innerText = `Page: ${getCurrentPage().name}`;
+        }
+
+        function addPage() {
+            const id = uid('page');
+            const name = 'Page ' + (project.pages.length + 1);
+            project.pages.push({
+                id,
+                name,
+                background: "#ffffff",
+                script: "",
+                transition: "fade",
+                elements: []
+            });
+            switchPage(id);
+        }
+
+        function switchPage(pageId) {
+            activePageId = pageId;
+            selectedElementId = null;
+            renderPagesList();
+            renderCanvas();
+            updatePropertiesPanel();
+        }
+
+        function renamePage(pageId) {
+            const page = project.pages.find(p => p.id === pageId);
+            if (!page) return;
+            const newName = prompt("Rename Page:", page.name);
+            if (newName) {
+                page.name = newName;
+                renderPagesList();
+            }
+        }
+
+        function deletePage(pageId) {
+            if (project.pages.length <= 1) return;
+            project.pages = project.pages.filter(p => p.id !== pageId);
+            activePageId = project.pages[0].id;
+            renderPagesList();
+            renderCanvas();
+        }
+
+        /* ==========================================================================
+           4. CANVAS & ELEMENT RENDERING ENGINE
+           ========================================================================== */
+        function renderCanvas() {
+            const frame = document.getElementById('canvas-frame');
+            const layer = document.getElementById('canvas-elements');
+
+            frame.style.width = `${project.width}px`;
+            frame.style.height = `${project.height}px`;
+
+            layer.innerHTML = '';
+            const currentPage = getCurrentPage();
+
+            currentPage.elements.forEach(elem => {
+                const elemDiv = document.createElement('div');
+                elemDiv.id = `elem-${elem.id}`;
+                elemDiv.className = `absolute cursor-move select-none flex items-center ${
+                    selectedElementId === elem.id ? 'ring-2 ring-brand-500 ring-offset-1 z-20' : ''
+                }`;
+                elemDiv.style.left = `${elem.x}px`;
+                elemDiv.style.top = `${elem.y}px`;
+                elemDiv.style.width = `${elem.w}px`;
+                elemDiv.style.height = `${elem.h}px`;
+                elemDiv.style.backgroundColor = elem.bg || 'transparent';
+                elemDiv.style.color = elem.color || '#000000';
+                elemDiv.style.fontSize = `${elem.fontSize || 14}px`;
+                elemDiv.style.textAlign = elem.align || 'left';
+                elemDiv.style.zIndex = elem.zIndex || 1;
+                if (elem.type === 'shape') elemDiv.style.borderRadius = elem.radius || '4px';
+
+                // Render Inner Controls
+                elemDiv.innerHTML = renderControlInnerHTML(elem);
+
+                // Add Selection Click Handlers
+                elemDiv.addEventListener('pointerdown', (e) => {
+                    e.stopPropagation();
+                    selectElement(elem.id);
+                    startDragging(e, elem);
+                });
+
+                // Attach Resize Handles if Selected
+                if (selectedElementId === elem.id) {
+                    attachResizeHandles(elemDiv);
+                }
+
+                layer.appendChild(elemDiv);
+            });
+        }
+
+        function renderControlInnerHTML(elem) {
+            switch (elem.type) {
+                case 'text':
+                    return `<div class="w-full h-full flex items-center p-1" style="justify-content: ${getFlexJustify(elem.align)}">${esc(elem.text) || 'Text Box'}</div>`;
+                case 'button':
+                    return `<button class="w-full h-full bg-transparent text-white font-medium rounded shadow flex items-center justify-center px-2 pointer-events-none">${esc(elem.text) || 'Button'}</button>`;
+                case 'input':
+                    return `<input type="text" placeholder="${esc(elem.text) || 'Input...'}" value="${esc(elem.variable ? (project.variables[elem.variable] || '') : '')}" class="w-full h-full px-2 py-1 border rounded bg-white text-gray-800 pointer-events-none">`;
+                case 'image':
+                    return `<img src="${esc(elem.text) || 'https://placehold.co/200x150/e2e8f0/64748b?text=Image'}" class="w-full h-full object-cover rounded pointer-events-none" onerror="this.src='https://placehold.co/200x150/e2e8f0/64748b?text=Image'">`;
+                case 'radio':
+                    return `<label class="flex items-center space-x-2 p-1 pointer-events-none"><input type="radio"> <span>${esc(elem.text) || 'Radio'}</span></label>`;
+                case 'checkbox':
+                    return `<label class="flex items-center space-x-2 p-1 pointer-events-none"><input type="checkbox" class="rounded"> <span>${esc(elem.text) || 'Checkbox'}</span></label>`;
+                case 'dropdown':
+                    return `<select class="w-full h-full border rounded px-2 pointer-events-none"><option>${esc(elem.text) || 'Option 1'}</option></select>`;
+                case 'webview':
+                    return `<div class="w-full h-full bg-gray-100 text-gray-500 flex items-center justify-center text-xs border rounded pointer-events-none px-2 truncate">WebView: ${esc(elem.text)}</div>`;
+                case 'shape':
+                    return `<div class="w-full h-full" style="box-sizing:border-box;border:${elem.lw ?? 2}px solid ${esc(elem.lc || '#0284c7')};border-radius:${elem.radius || '4px'}"></div>`;
+                case 'media':
+                    return `<div class="w-full h-full bg-black/80 text-white flex flex-col items-center justify-center rounded p-2 text-xs">
+                        <i class="fa-solid fa-circle-play text-2xl mb-1"></i>
+                        <span>${esc(elem.text) || 'Media Player'}</span>
+                    </div>`;
+                default:
+                    return `<div>${esc(elem.text)}</div>`;
+            }
+        }
+
+        function getFlexJustify(align) {
+            if (align === 'center') return 'center';
+            if (align === 'right') return 'flex-end';
+            return 'flex-start';
+        }
+
+        /* ==========================================================================
+           5. ELEMENT CREATION & MANIPULATION
+           ========================================================================== */
+        function addNewElement(type) {
+            const page = getCurrentPage();
+            const id = uid('elem');
+            const newElem = {
+                id,
+                name: `${type}_${page.elements.length + 1}`,
+                type,
+                x: 40 + (page.elements.length * 10),
+                y: 40 + (page.elements.length * 10),
+                w: type === 'button' ? 120 : (type === 'image' ? 200 : 160),
+                h: type === 'button' ? 40 : (type === 'image' ? 150 : 36),
+                text: type === 'button' ? 'Click Me' : (type === 'text' ? 'Sample Text' : ''),
+                variable: '',
+                fontSize: 14,
+                color: '#1e293b',
+                bg: type === 'button' ? '#0284c7' : 'transparent',
+                align: 'left',
+                script: '',
+                zIndex: page.elements.length + 1
+            };
+
+            page.elements.push(newElem);
+            selectElement(id);
+            renderCanvas();
+        }
+
+        function selectElement(id) {
+            selectedElementId = id;
+            renderCanvas();
+            updatePropertiesPanel();
+
+            const quickBar = document.getElementById('quick-element-actions');
+            if (id) {
+                quickBar.classList.remove('hidden');
+                quickBar.classList.add('flex');
+            } else {
+                quickBar.classList.add('hidden');
+            }
+        }
+
+        function duplicateSelectedElement() {
+            if (!selectedElementId) return;
+            const page = getCurrentPage();
+            const elem = page.elements.find(e => e.id === selectedElementId);
+            if (!elem) return;
+
+            const copy = JSON.parse(JSON.stringify(elem));
+            copy.id = uid('elem');
+            copy.x += 20;
+            copy.y += 20;
+            copy.name += '_copy';
+
+            page.elements.push(copy);
+            selectElement(copy.id);
+        }
+
+        function deleteSelectedElement() {
+            if (!selectedElementId) return;
+            const page = getCurrentPage();
+            page.elements = page.elements.filter(e => e.id !== selectedElementId);
+            selectElement(null);
+        }
+
+        function arrangeElement(dir) {
+            if (!selectedElementId) return;
+            const page = getCurrentPage();
+            const elem = page.elements.find(e => e.id === selectedElementId);
+            if (!elem) return;
+
+            if (dir === 'front') {
+                elem.zIndex = Math.max(...page.elements.map(e => e.zIndex || 1)) + 1;
+            } else {
+                elem.zIndex = Math.min(...page.elements.map(e => e.zIndex || 1)) - 1;
+            }
+            renderCanvas();
+        }
+
+        /* ==========================================================================
+           6. TOUCH & MOUSE DRAG/RESIZE HANDLERS
+           ========================================================================== */
+        function attachResizeHandles(elemDiv) {
+            const handles = ['tl', 'tr', 'bl', 'br'];
+            handles.forEach(type => {
+                const handle = document.createElement('div');
+                handle.className = `resize-handle ${getHandlePositionClass(type)}`;
+                handle.addEventListener('pointerdown', (e) => {
+                    e.stopPropagation();
+                    startResizing(e, type);
+                });
+                elemDiv.appendChild(handle);
+            });
+        }
+
+        function getHandlePositionClass(type) {
+            switch (type) {
+                case 'tl': return '-top-1.5 -left-1.5 cursor-nwse-resize';
+                case 'tr': return '-top-1.5 -right-1.5 cursor-nesw-resize';
+                case 'bl': return '-bottom-1.5 -left-1.5 cursor-nesw-resize';
+                case 'br': return '-bottom-1.5 -right-1.5 cursor-nwse-resize';
+            }
+        }
+
+        function setupTouchAndMouseEvents() {
+            window.addEventListener('pointermove', handlePointerMove);
+            window.addEventListener('pointerup', handlePointerUp);
+            
+            // Clear selection when clicking canvas bg
+            document.getElementById('canvas-container').addEventListener('pointerdown', (e) => {
+                if (e.target.id === 'canvas-container' || e.target.id === 'canvas-frame') {
+                    selectElement(null);
+                }
+            });
+        }
+
+        function startDragging(e, elem) {
+            isDragging = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            initialElemPos = { x: elem.x, y: elem.y, w: elem.w, h: elem.h };
+        }
+
+        function startResizing(e, handleType) {
+            isResizing = true;
+            resizeHandleType = handleType;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+            const page = getCurrentPage();
+            const elem = page.elements.find(e => e.id === selectedElementId);
+            initialElemPos = { x: elem.x, y: elem.y, w: elem.w, h: elem.h };
+        }
+
+        function handlePointerMove(e) {
+            if (!isDragging && !isResizing) return;
+            const page = getCurrentPage();
+            const elem = page.elements.find(el => el.id === selectedElementId);
+            if (!elem) return;
+
+            const deltaX = (e.clientX - dragStartX) / zoomLevel;
+            const deltaY = (e.clientY - dragStartY) / zoomLevel;
+
+            if (isDragging) {
+                let newX = initialElemPos.x + deltaX;
+                let newY = initialElemPos.y + deltaY;
+
+                if (snapToGrid) {
+                    newX = Math.round(newX / 10) * 10;
+                    newY = Math.round(newY / 10) * 10;
+                }
+
+                elem.x = Math.max(0, newX);
+                elem.y = Math.max(0, newY);
+                syncElemStyle(elem);
+                updatePropertiesPanel();
+            } else if (isResizing) {
+                let newW = initialElemPos.w;
+                let newH = initialElemPos.h;
+                let newX = initialElemPos.x;
+                let newY = initialElemPos.y;
+
+                if (resizeHandleType.includes('r')) newW = initialElemPos.w + deltaX;
+                if (resizeHandleType.includes('b')) newH = initialElemPos.h + deltaY;
+                if (resizeHandleType.includes('l')) {
+                    newW = initialElemPos.w - deltaX;
+                    newX = initialElemPos.x + deltaX;
+                }
+                if (resizeHandleType.includes('t')) {
+                    newH = initialElemPos.h - deltaY;
+                    newY = initialElemPos.y + deltaY;
+                }
+
+                elem.w = Math.max(20, newW);
+                elem.h = Math.max(20, newH);
+                elem.x = newX;
+                elem.y = newY;
+
+                syncElemStyle(elem);
+                updatePropertiesPanel();
+            }
+        }
+
+        function handlePointerUp() {
+            isDragging = false;
+            isResizing = false;
+        }
+
+        /* ==========================================================================
+           7. PROPERTIES & VARIABLE BINDING LOGIC
+           ========================================================================== */
+        function updatePropertiesPanel() {
+            const form = document.getElementById('properties-form');
+            const noMsg = document.getElementById('no-selection-msg');
+
+            if (!selectedElementId) {
+                form.classList.add('hidden');
+                noMsg.classList.remove('hidden');
+                return;
+            }
+
+            form.classList.remove('hidden');
+            noMsg.classList.add('hidden');
+
+            const page = getCurrentPage();
+            const elem = page.elements.find(e => e.id === selectedElementId);
+            if (!elem) return;
+
+            document.getElementById('prop-elem-type').innerText = elem.type.toUpperCase();
+            document.getElementById('prop-elem-id').innerText = `#${elem.id}`;
+            document.getElementById('prop-name').value = elem.name || '';
+            document.getElementById('prop-text').value = elem.text || '';
+            document.getElementById('prop-variable').value = elem.variable || '';
+            document.getElementById('prop-x').value = elem.x;
+            document.getElementById('prop-y').value = elem.y;
+            document.getElementById('prop-w').value = elem.w;
+            document.getElementById('prop-h').value = elem.h;
+            document.getElementById('prop-color').value = elem.color || '#000000';
+            document.getElementById('prop-bg').value = elem.bg || '#ffffff';
+            document.getElementById('prop-font-size').value = elem.fontSize || 14;
+            document.getElementById('prop-align').value = elem.align || 'left';
+        }
+
+        function updateSelectedElementProp(prop, value) {
+            if (!selectedElementId) return;
+            const page = getCurrentPage();
+            const elem = page.elements.find(e => e.id === selectedElementId);
+            if (elem) {
+                elem[prop] = value;
+                renderCanvas();
+            }
+        }
+
+        function renderVariablesList() {
+            const list = document.getElementById('variables-list');
+            list.innerHTML = '';
+
+            Object.keys(project.variables).forEach(varName => {
+                const item = document.createElement('div');
+                item.className = "flex items-center justify-between bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700 text-xs";
+                item.innerHTML = `
+                    <div class="flex flex-col truncate">
+                        <span class="font-mono text-brand-600 dark:text-brand-400 font-semibold">${esc(varName)}</span>
+                        <input type="text" value="${esc(project.variables[varName])}" onchange="updateVariableValue('${esc(varName)}', this.value)" class="bg-transparent border-b border-gray-300 dark:border-gray-600 focus:outline-none text-xs py-0.5">
+                    </div>
+                    <button onclick="deleteVariable('${esc(varName)}')" class="text-red-500 hover:text-red-700 ml-2"><i class="fa-solid fa-trash"></i></button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function updateVariableValue(varName, val) {
+            project.variables[varName] = val;
+            renderCanvas();
+        }
+
+        function addNewVariablePrompt() {
+            const name = prompt("Enter Variable Name (e.g. [Score]):", "[NewVar]");
+            if (name) {
+                name = name.replace(/[^\w\u4e00-\u9fff\[\]]/g, '');
+                const formatted = name.startsWith('[') && name.endsWith(']') ? name : `[${name}]`;
+                project.variables[formatted] = "0";
+                renderVariablesList();
+            }
+        }
+
+        function deleteVariable(varName) {
+            delete project.variables[varName];
+            renderVariablesList();
+        }
+
+        /* ==========================================================================
+           8. NEOSCRIPT ACTION BUILDER & INTERPRETER
+           ========================================================================== */
+        function openScriptEditorForSelectedElement() {
+            if (!selectedElementId) return;
+            const page = getCurrentPage();
+            const elem = page.elements.find(e => e.id === selectedElementId);
+            activeScriptTarget = { type: 'element', id: elem.id };
+
+            document.getElementById('script-modal-title').innerText = `NeoScript: ${elem.name}`;
+            document.getElementById('script-code-input').value = elem.script || '';
+            document.getElementById('modal-script-editor').classList.remove('hidden');
+        }
+
+        function openScriptEditorForCurrentPage() {
+            const page = getCurrentPage();
+            activeScriptTarget = { type: 'page', id: page.id };
+
+            document.getElementById('script-modal-title').innerText = `NeoScript: ${page.name} (Page Action)`;
+            document.getElementById('script-code-input').value = page.script || '';
+            document.getElementById('modal-script-editor').classList.remove('hidden');
+        }
+
+        function closeScriptEditor() {
+            document.getElementById('modal-script-editor').classList.add('hidden');
+        }
+
+        function insertScriptCommand(cmd) {
+            const input = document.getElementById('script-code-input');
+            let template = '';
+            switch (cmd) {
+                case 'GotoPage': template = 'GotoPage "Page 1"\n'; break;
+                case 'SetVar': template = 'SetVar "[Score]" "100"\n'; break;
+                case 'Alert': template = 'Alert "Hello NeoBook World!"\n'; break;
+                case 'ShowObject': template = 'ShowObject "elem_1"\n'; break;
+                case 'HideObject': template = 'HideObject "elem_1"\n'; break;
+                case 'PlayAudio': template = 'PlayAudio "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"\n'; break;
+                case 'If': template = 'If "[Score]" "=" "100"\n  Alert "Winner!"\nEndIf\n'; break;
+            }
+            input.value += template;
+        }
+
+        function saveScriptCode() {
+            const code = document.getElementById('script-code-input').value;
+            if (activeScriptTarget.type === 'element') {
+                const page = getCurrentPage();
+                const elem = page.elements.find(e => e.id === activeScriptTarget.id);
+                if (elem) elem.script = code;
+            } else {
+                const page = project.pages.find(p => p.id === activeScriptTarget.id);
+                if (page) page.script = code;
+            }
+            closeScriptEditor();
+        }
+
+        // NeoScript Parser Engine (If/Else/EndIf, all-occurrence variables, async Delay)
+        function subVars(s) { return String(s).replace(/\[[^\[\]]+\]/g, m => (m in project.variables) ? project.variables[m] : m); }
+        function findRuntimeEl(n) {
+            const q = CSS.escape(n);
+            return document.querySelector(`#player-viewport [data-name="${q}"], #player-viewport [data-id="${q}"]`);
+        }
+        function mkPlugins() {
+            return { actions: {}, controls: {}, register(p) {
+                for (const [k, f] of Object.entries(p.actions || {})) this.actions[k.toLowerCase()] = f;
+                Object.assign(this.controls, p.controls || {});
+            } };
+        }
+        function coreActions() {
+            const fk = p => 'nbfs:' + p, rd = p => (localStorage.getItem(fk(p)) ?? '').split('\n');
+            const rdv = (a, c, r) => { const L = rd(a[0]); c.project.variables[r[2]] = a[1] === 'All' ? L.join('\n') : (L[(+a[1] || 1) - 1] ?? ''); c.refresh(); };
+            return {
+                httpget: async (a, c, r) => { try { c.project.variables[r[1]] = await (await fetch(a[0])).text(); } catch (e) { c.project.variables[r[1]] = 'ERROR: ' + e.message; } c.refresh(); },
+                jsonget: (a, c, r) => { try { let v = JSON.parse(a[0]); for (const k of String(a[1]).split('.').filter(Boolean)) v = v?.[k]; c.project.variables[r[2]] = typeof v === 'object' ? JSON.stringify(v) : String(v ?? ''); } catch (e) { c.project.variables[r[2]] = ''; } c.refresh(); },
+                filewrite: a => { try { if (a[1] === 'All') localStorage.setItem(fk(a[0]), a[2]); else { const L = rd(a[0]); L[(+a[1] || 1) - 1] = a[2]; localStorage.setItem(fk(a[0]), L.join('\n')); } } catch (e) {} },
+                fileread: rdv,
+                filetovar: (a, c, r) => rdv([a[0], 'All', ''], c, ['', '', r[1]]),
+                fileerase: a => { try { localStorage.removeItem(fk(a[0])); } catch (e) {} },
+                call: (a, c) => c.run(c.project.functions?.[a[0]] || ''),
+                math: (a, c, r) => { let v = 0; if (/^[\d\s+\-*\/().]+$/.test(a[0])) { try { v = Function('return(' + a[0] + ')')(); } catch (e) {} } if (!isFinite(v)) v = 0; c.project.variables[r[2]] = (+v).toFixed(Math.max(0, +a[1] || 0)); c.refresh(); },
+                systemsound: () => {},
+                focusobject: (a, c) => { const n = c.findRuntimeEl(a[0]); if (n) { const f = n.querySelector('input,textarea,select,button'); if (f) f.focus(); } }
+            };
+        }
+        const NeoPlugins = mkPlugins();
+        NeoPlugins.register({ actions: coreActions() });
+        function numExpr(raw, v) {
+            if (/^\[[^\]]+\]\s*[+\-*\/]\s*-?[\d.]+$/.test(raw) && /^[\d\s+\-*\/.()]+$/.test(v)) { try { return String(Function('return(' + v + ')')()); } catch (e) {} }
+            return v;
+        }
+        function assetUrl(n) { n = String(n || ''); return /^(https?:|data:)/i.test(n) ? n : ((project.assets || {})[n.toLowerCase()] || ''); }
+        function neoApi() { return { project, subVars, findRuntimeEl, run: executeNeoScript, refresh: refreshTpl }; }
+        function loadPlugin(code) { try { new Function('NeoPlugins', code)(NeoPlugins); return true; } catch (e) { alert('Plugin error: ' + e.message); return false; } }
+        function refreshTpl() {
+            document.querySelectorAll('#player-viewport [data-tpl]').forEach(n => { n.firstElementChild.textContent = subVars(n.dataset.tpl); });
+            document.querySelectorAll('#player-viewport [data-var]').forEach(n => { const v = project.variables[n.dataset.var] ?? ''; if (n.dataset.val !== undefined) n.querySelector('input').checked = v === n.dataset.val; else n.firstElementChild.value = v; });
+        }
+        async function executeNeoScript(script) {
+            if (!script) return;
+            const L = script.split('\n').map(s => s.trim()).filter(s => s && !s.startsWith('//') && !s.startsWith(';'));
+            const cmp = (a, op, b) => {
+                const x = parseFloat(a), y = parseFloat(b), n = !isNaN(x) && !isNaN(y);
+                switch (op) {
+                    case '=': return n ? x === y : a === b;
+                    case '<>': return n ? x !== y : a !== b;
+                    case '>': return n ? x > y : a > b;
+                    case '<': return n ? x < y : a < b;
+                    case '>=': return n ? x >= y : a >= b;
+                    case '<=': return n ? x <= y : a <= b;
+                    case 'contains': return a.includes(b);
+                }
+                return false;
+            };
+            let i = 0;
+            const skip = () => { let d = 1; while (++i < L.length) { const c = L[i].split(/\s/)[0].toLowerCase(); if (c === 'if') d++; else if (c === 'endif' && --d === 0) return; else if (c === 'else' && d === 1) return; } };
+            for (i = 0; i < L.length; i++) {
+                const cmd = L[i].split(/\s/)[0].toLowerCase();
+                const raw = [...L[i].matchAll(/"((?:[^"\\]|\\.)*)"/g)].map(m => m[1]);
+                const a = raw.map(subVars);
+                let el;
+                switch (cmd) {
+                    case 'gotopage': { const p = project.pages.find(p => p.name === a[0] || p.id === a[0]); if (p) { runSwitchToPage(p.id); return; } break; }
+                    case 'setvar': if (raw.length >= 2) { project.variables[raw[0]] = numExpr(raw[1], a[1]); refreshTpl(); if (typeof renderVariablesList === 'function') renderVariablesList(); } break;
+                    case 'alert': case 'messagebox': alert(a[0] ?? 'Notification'); break;
+                    case 'hideobject': if ((el = findRuntimeEl(a[0]))) el.style.display = 'none'; break;
+                    case 'showobject': if ((el = findRuntimeEl(a[0]))) el.style.display = 'flex'; break;
+                    case 'playaudio': try { new Audio(a[0]).play(); } catch (e) {} break;
+                    case 'openurl': if (/^https?:/i.test(a[0] || '')) window.open(a[0], '_blank', 'noopener'); break;
+                    case 'delay': await new Promise(r => setTimeout(r, parseInt(a[0]) || 0)); break;
+                    case 'if': if (!cmp(a[0], (a[1] || '').toLowerCase(), a[2] ?? '')) skip(); break;
+                    case 'else': skip(); break;
+                    case 'setobjectfill': if ((el = findRuntimeEl(a[0]))) el.style.backgroundColor = a[1]; break;
+                    case 'moveobject': if ((el = findRuntimeEl(a[0]))) { el.style.left = a[1] + 'px'; el.style.top = a[2] + 'px'; } break;
+                    case 'alertbox': alert(a[1] ?? a[0]); break;
+                    case 'function': { const body = []; while (++i < L.length && L[i].split(/\s/)[0].toLowerCase() !== 'endfunction') body.push(L[i]); (project.functions ||= {})[a[0]] = body.join('\n'); break; }
+                    case 'gotonextpage': case 'gotoprevpage': { const p = project.pages[project.pages.indexOf(window._cur) + (cmd === 'gotonextpage' ? 1 : -1)]; if (p) { runSwitchToPage(p.id); return; } break; }
+                    case 'exit': if (a[1] && !confirm(a[1])) break; return;
+                    default: { const f = NeoPlugins.actions[cmd]; if (f) await f(a, neoApi(), raw); }
+                }
+            }
+        }
+
+        /* ==========================================================================
+           9. LIVE INTERACTIVE RUNNER / PREVIEW PLAYER ENGINE
+           ========================================================================== */
+        function runPublication() {
+            const overlay = document.getElementById('player-overlay');
+            const viewport = document.getElementById('player-viewport');
+            
+            viewport.style.width = `${project.width}px`;
+            viewport.style.height = `${project.height}px`;
+            viewport.style.transform = `scale(${Math.min(1, (innerWidth - 16) / project.width, (innerHeight - 72) / project.height)})`;
+
+            overlay.classList.remove('hidden');
+            runSwitchToPage(activePageId);
+        }
+
+        function stopPublication() {
+            document.getElementById('player-overlay').classList.add('hidden');
+        }
+
+        function runSwitchToPage(pageId) {
+            const page = project.pages.find(p => p.id === pageId);
+            if (!page) return;
+            if (window._cur && window._cur.exitScript) executeNeoScript(window._cur.exitScript);
+            window._cur = page;
+            const vp = document.getElementById('player-viewport');
+            vp.innerHTML = '';
+            const pd = document.createElement('div');
+            pd.className = "w-full h-full relative overflow-hidden page-transition trans-fade-enter";
+            pd.style.backgroundColor = page.background || '#ffffff';
+            page.elements.forEach(e => {
+                const el = document.createElement('div');
+                el.dataset.name = e.name; el.dataset.id = e.id;
+                el.className = "absolute flex items-center";
+                Object.assign(el.style, { left: e.x + 'px', top: e.y + 'px', width: e.w + 'px', height: e.h + 'px', color: e.color, backgroundColor: e.type === 'button' ? '' : e.bg, fontSize: (e.fontSize || 14) + 'px', zIndex: e.zIndex || 1 });
+                if (e.type === 'shape') el.style.borderRadius = e.radius || '4px';
+                const t = esc(subVars(e.text)), bound = e.variable ? project.variables[e.variable] || '' : '';
+                const setVar = v => { if (e.variable) project.variables[e.variable] = v; };
+                const pc = NeoPlugins.controls[e.type];
+                if (pc) pc(el, e, neoApi()); else switch (e.type) {
+                    case 'webview':
+                        el.innerHTML = /^https?:/i.test(e.text || '') ? `<iframe src="${t}" sandbox="allow-scripts allow-same-origin allow-forms" class="w-full h-full border-0 rounded bg-white"></iframe>` : ''; break;
+                    case 'button':
+                        el.innerHTML = `<button class="w-full h-full text-white font-semibold rounded shadow transition active:scale-95 px-2" style="background:${e.img && assetUrl(e.img) ? 'url(' + esc(assetUrl(e.img)) + ') center/100% 100% no-repeat' : esc(e.bg || '#0284c7')}">${t}</button>`; break;
+                    case 'input':
+                        const cls = 'w-full h-full px-2 py-1 border rounded bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-500';
+                        el.innerHTML = e.h > 40 ? `<textarea placeholder="${t}" class="${cls} resize-none">${esc(bound)}</textarea>` : `<input type="text" value="${esc(bound)}" placeholder="${t}" class="${cls}">`;
+                        if (e.variable) el.dataset.var = e.variable;
+                        el.firstChild.oninput = ev => setVar(ev.target.value); break;
+                    case 'radio':
+                        el.innerHTML = `<label class="flex items-center space-x-2 p-1 cursor-pointer"><input type="radio" name="r_${esc(e.variable)}" ${bound === (e.text || '') ? 'checked' : ''}> <span>${t}</span></label>`;
+                        el.dataset.var = e.variable || ''; el.dataset.val = e.text || '';
+                        el.querySelector('input').onchange = () => setVar(e.text || ''); break;
+                    case 'checkbox':
+                        el.innerHTML = `<label class="flex items-center space-x-2 p-1"><input type="checkbox" ${bound === 'true' ? 'checked' : ''}> <span>${t}</span></label>`;
+                        el.querySelector('input').onchange = ev => setVar(String(ev.target.checked)); break;
+                    case 'dropdown':
+                        el.innerHTML = `<select class="w-full h-full border rounded px-2 text-gray-800 bg-white">${(e.text || 'Option 1').split(/[,\n]/).map(s => `<option ${s.trim() === bound ? 'selected' : ''}>${esc(s.trim())}</option>`).join('')}</select>`;
+                        el.firstChild.onchange = ev => setVar(ev.target.value); if (e.variable && !bound) setVar(el.firstChild.value); break;
+                    case 'image':
+                        el.innerHTML = `<img src="${esc(assetUrl(e.text) || 'https://placehold.co/200x150')}" alt="" class="w-full h-full object-cover rounded">`; break;
+                    case 'shape':
+                        el.innerHTML = `<div class="w-full h-full" style="box-sizing:border-box;border:${e.lw ?? 2}px solid ${esc(e.lc || '#0284c7')};border-radius:${e.radius || '4px'}"></div>`; break;
+                    case 'media':
+                        el.innerHTML = /\.(mp4|webm|ogv)(\?|$)/i.test(e.text || '') ? `<video src="${t}" controls class="w-full h-full rounded"></video>` : `<audio src="${t}" controls class="w-full"></audio>`; break;
+                    default:
+                        el.innerHTML = `<div class="w-full h-full flex items-center p-1" style="justify-content:${getFlexJustify(e.align)};white-space:pre-wrap">${t}</div>`;
+                        el.dataset.tpl = e.text || '';
+                }
+                if (e.script && !['input', 'checkbox', 'dropdown', 'media'].includes(e.type)) { el.onclick = () => executeNeoScript(e.script); el.style.cursor = 'pointer'; }
+                pd.appendChild(el);
+            });
+            vp.appendChild(pd);
+            if (page.script) executeNeoScript(page.script);
+            requestAnimationFrame(() => pd.classList.add('trans-fade-active'));
+        }
+
+        /* ==========================================================================
+           10. IMPORT & EXPORT SYSTEM (.pub / JSON & HTML Bundle)
+           ========================================================================== */
+        function createNewProject() {
+            if (confirm("Create new project? Unsaved changes will be lost.")) {
+                project = {
+                    title: "Untitled NeoBook Publication",
+                    width: 800,
+                    height: 600,
+                    pages: [{ id: "page_1", name: "Page 1", background: "#ffffff", script: "", elements: [] }],
+                    variables: {}
+                };
+                activePageId = "page_1";
+                selectedElementId = null;
+                renderPagesList();
+                renderCanvas();
+                renderVariablesList();
+            }
+        }
+
+        function exportProject() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(project, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", `${project.title.toLowerCase().replace(/\s+/g, '_')}.json`);
+            dlAnchorElem.click();
+        }
+
+        function triggerImportProject() {
+            document.getElementById('file-input-import').click();
+        }
+
+        /* ---- NeoBook .pub (NBW Publication Source File) importer ---- */
+        const BGR = n => { n = +n; if (!(n >= 0 && n < 0x20000000)) return ''; n &= 0xFFFFFF; return '#' + [n & 255, (n >> 8) & 255, (n >> 16) & 255].map(v => v.toString(16).padStart(2, '0')).join(''); };
+        function rtfStrip(r) {
+            let o = '', i = 0;
+            while (i < r.length) {
+                if (r[i] === '{' && r[i + 1] === '\\' && r[i + 2] === '*') { let d = 0; do { if (r[i] === '{') d++; else if (r[i] === '}') d--; i++; } while (d > 0 && i < r.length); }
+                else o += r[i++];
+            }
+            return o;
+        }
+        function rtfToText(r) {
+            r = rtfStrip(r);
+            const size = (r.match(/\\fs(\d+)/) || [])[1], al = /\\qc/.test(r) ? 'center' : /\\qr/.test(r) ? 'right' : 'left';
+            const tbl = ((r.match(/\{\\colortbl([^}]*)\}/) || [])[1] || '').split(';').map(c => c.match(/\\red(\d+)\\green(\d+)\\blue(\d+)/)).filter(Boolean);
+            const cf = +((r.match(/\\cf([1-9]\d*)/) || [])[1] || 0), c = tbl[cf];
+            const text = r.replace(/\{\\fonttbl[\s\S]*?\}\}/, '').replace(/\{\\colortbl[^}]*\}/, '').replace(/\\(par|line)\b ?/g, '\n').replace(/\\'[0-9a-f]{2}/gi, '?').replace(/\\[a-zA-Z]+-?\d* ?/g, '').replace(/[{}]/g, '').split('¶').join('').trim();
+            return { text, align: al, size: size ? Math.round(size / 2 * 1.33) : 0, color: c ? '#' + [c[1], c[2], c[3]].map(v => (+v).toString(16).padStart(2, '0')).join('') : '' };
+        }
+        const NB_SUPPORTED = ['setvar', 'if', 'else', 'endif', 'showobject', 'hideobject', 'setobjectfill', 'moveobject', 'alertbox', 'messagebox', 'alert', 'gotopage', 'exit', 'playaudio', 'openurl', 'delay', 'function', 'endfunction', 'gotonextpage', 'gotoprevpage'];
+        function parseNBW(txt) {
+            const H = {}, pages = [], badTypes = new Set(), badCmds = new Set(), acts = s => (s || '').split('¶').join('\n');
+            let pg = null, o = null, tray = false;
+            const newPage = n => { pg = { id: uid('page'), name: n, background: '#ffffff', script: '', transition: 'fade', elements: [] }; pages.push(pg); };
+            const master = [], flush = () => { if (o) { (pg ? pg.elements : master).push(conv(o)); o = null; } };
+            const refs = new Set(), fill = k => (k.FillPattern || '0') === '0' ? BGR(k.FillColor) : '';
+            const conv = ({ t, k }) => {
+                if (k.FileName) refs.add(k.FileName); if (k.UpImage) refs.add(k.UpImage);
+                const e = { id: uid('elem'), name: k.Name || 'obj', type: 'text', x: +k.X || +k.X1 || 0, y: +k.Y || +k.Y1 || 0, w: +k.W || 20, h: +k.H || 20, text: '', variable: '', fontSize: Math.round((+k.FontSize || 8) * 1.33), color: BGR(k.TextColor) || '#000000', bg: '', align: 'left', script: acts(k.ObjAction), zIndex: +k.TabOrder || 1 };
+                if (t === 3) { e.type = 'button'; e.text = k.Text || ''; e.img = k.UpImage || ''; e.bg = e.img ? '' : '#0284c7'; e.color = '#ffffff'; }
+                else if (t === 5 || t === 6) { e.type = 'shape'; e.bg = fill(k); e.lc = BGR(k.LineColor) || '#000000'; e.lw = +k.LineWidth; if (t === 6) e.radius = '50%'; }
+                else if (t === 7) { const x1 = +k.X1, x2 = +k.X2, y1 = +k.Y1, y2 = +k.Y2; e.type = 'shape'; e.x = Math.min(x1, x2); e.y = Math.min(y1, y2); e.w = Math.max(Math.abs(x2 - x1), 1); e.h = Math.max(Math.abs(y2 - y1), +k.LineWidth || 1); e.bg = BGR(k.LineColor) || '#000000'; e.lw = 0; }
+                else if (t === 8) { const r = rtfToText(k.Text || ''); e.text = r.text; e.align = r.align; if (r.size) e.fontSize = r.size; if (r.color) e.color = r.color; e.bg = fill(k); }
+                else if (t === 13) { e.type = 'radio'; e.text = k.Text || ''; e.variable = k.VarName || ''; }
+                else if (t === 4) { e.type = 'image'; e.text = k.FileName || ''; }
+                else if (t === 9) { e.type = 'input'; e.text = k.Hint || ''; e.variable = k.VarName || ''; }
+                else { badTypes.add(t); e.text = `[ObjectType ${t}]`; e.bg = '#fee2e2'; }
+                return e;
+            };
+            for (const l of txt.split(/\r?\n/)) {
+                if (l === 'TrayMenuBegin') { tray = true; continue; }
+                if (l === 'MenuEnd') { tray = false; continue; }
+                const i = l.indexOf('=');
+                if (tray || i < 0) continue;
+                const k = l.slice(0, i), v = l.slice(i + 1);
+                if (k === 'NewPage') { flush(); newPage(v); }
+                else if (k === 'ObjectType') { flush(); o = { t: +v, k: {} }; }
+                else if (o) o.k[k] = v;
+                else if (pg) { if (k === 'PageColor') pg.background = BGR(v) || '#ffffff'; else if (k === 'PgEnterAction') pg.script = acts(v); else if (k === 'PgExitAction') pg.exitScript = acts(v); }
+                else H[k] = v;
+            }
+            flush();
+            if (!pages.length) newPage('Page 1');
+            pages.forEach(p => p.elements.unshift(...master.map(m => ({ ...m, id: uid('elem') }))));
+            const variables = {};
+            (H.Variables || '').split('¶').filter(Boolean).forEach(v => variables[v] = '');
+            const scripts = pages.flatMap(p => [p.script, ...p.elements.map(e => e.script)]);
+            scripts.forEach(s => (s || '').split('\n').forEach(l => { const c = l.trim().split(/\s/)[0]; if (c && c[0] !== '.' && !NB_SUPPORTED.includes(c.toLowerCase()) && !(c.toLowerCase() in NeoPlugins.actions)) badCmds.add(c); }));
+            return { project: { title: H.Title || 'NeoBook Import', width: +H.ScreenWidth || 800, height: +H.ScreenHeight || 600, pages, variables }, badTypes: [...badTypes], badCmds: [...badCmds], refs: [...refs] };
+        }
+
+        async function importProject(event) {
+            const files = [...event.target.files]; event.target.value = '';
+            const isImg = f => /^image\//.test(f.type) || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(f.name);
+            const main = files.find(f => !isImg(f)), assets = {};
+            for (const f of files.filter(isImg)) assets[f.name.toLowerCase()] = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); });
+            try {
+                let note = '', refs = [];
+                if (main) {
+                    const buf = await main.arrayBuffer(); let txt, p;
+                    try { txt = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (_) { txt = new TextDecoder('windows-1252').decode(buf); }
+                    if (txt.slice(0, 300).includes('NBW Publication Source File')) {
+                        const r = parseNBW(txt); p = r.project; refs = r.refs;
+                        note = 'NeoBook .pub 已匯入。' + (r.badTypes.length ? `\n尚未支援的物件類型：${r.badTypes.join(', ')}（以紅底方塊佔位）` : '') + (r.badCmds.length ? `\n尚未支援的指令（執行時會略過）：${r.badCmds.join(', ')}` : '');
+                    } else p = JSON.parse(txt);
+                    if (!Array.isArray(p.pages) || !p.pages.length) throw new Error('no pages');
+                    p.width = +p.width || 800; p.height = +p.height || 600; p.variables = p.variables || {};
+                    p.pages.forEach((pg, i) => { pg.id = pg.id || uid('page'); pg.name = pg.name || 'Page ' + (i + 1); pg.elements = pg.elements || []; });
+                    project = p; activePageId = p.pages[0].id; selectedElementId = null;
+                    (project.plugins || []).forEach(loadPlugin);
+                }
+                project.assets = Object.assign(project.assets || {}, assets);
+                const miss = refs.filter(n => !project.assets[n.toLowerCase()]);
+                if (miss.length) note += `\n缺少圖檔（請重新匯入時和 .pub 一起多選）：${miss.join(', ')}`;
+                renderPagesList(); renderCanvas(); renderVariablesList(); updatePropertiesPanel(); fitZoom();
+                if (note) alert(note);
+            } catch (err) { alert("Invalid NeoBook Project File."); }
+        }
+
+        function exportStandaloneHTML() {
+            const rt = [mkPlugins, coreActions, numExpr, assetUrl, esc, getFlexJustify, subVars, neoApi, refreshTpl, findRuntimeEl, executeNeoScript, runSwitchToPage].map(f => f.toString()).join('\n');
+            const js = `const project = ${JSON.stringify(project).replace(/</g, '\\u003c')};\n${rt}\n` +
+                `var NeoPlugins=mkPlugins();NeoPlugins.register({actions:coreActions()});\n${(project.plugins || []).map(c => `try{(function(NeoPlugins){${c.replace(/<\//g, '<\\/')}})(NeoPlugins)}catch(e){}`).join('\n')}\n` +
+                `(function(){const vp=document.getElementById('player-viewport');const fit=()=>{vp.style.transform='scale('+Math.min(1,(innerWidth-16)/project.width,(innerHeight-16)/project.height)+')'};addEventListener('resize',fit);fit();runSwitchToPage(project.pages[0].id)})();`;
+            const html = `<!DOCTYPE html>
+<html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${esc(project.title)}</title>
+<script src="https://cdn.tailwindcss.com"><\/script>
+<script>tailwind.config={theme:{extend:{colors:{brand:{50:'#f0f9ff',100:'#e0f2fe',500:'#0284c7',600:'#0369a1',700:'#075985'}}}}}<\/script>
+<style>.page-transition{transition:all .35s cubic-bezier(.4,0,.2,1)}.trans-fade-enter{opacity:0}.trans-fade-active{opacity:1}</style>
+</head>
+<body class="bg-gray-900 h-screen w-screen flex items-center justify-center m-0 overflow-hidden">
+<div id="player-viewport" class="relative bg-white shadow-2xl overflow-hidden" style="width:${project.width}px;height:${project.height}px"></div>
+<script>${js}<\/script>
+</body></html>`;
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+            a.download = `${project.title.toLowerCase().replace(/\s+/g, '_')}_app.html`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        }
+    </script>
+</body>
+</html>
