@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- JSZip (used only when exporting a self-hostable PWA bundle) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
     
@@ -111,16 +113,24 @@
                 <button onclick="createNewProject()" title="New Project" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
                     <i class="fa-solid fa-file"></i>
                 </button>
-                <button onclick="triggerImportProject()" title="Open Project" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
+                <button onclick="triggerImportProject()" title="開啟專案（可多選 .pub/.json 與圖檔）" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
                     <i class="fa-solid fa-folder-open"></i>
                 </button>
-                <input type="file" id="file-input-import" accept=".json,.pub,image/*" multiple class="hidden" onchange="importProject(event)">
+                <input type="file" id="file-input-import" accept=".json,.pub,image/*" multiple class="hidden" onchange="importProjectFiles(event.target.files)">
+                <button onclick="document.getElementById('file-input-import-folder').click()" title="選擇整個資料夾匯入（自動帶入同資料夾圖檔）" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
+                    <i class="fa-solid fa-folder-tree"></i>
+                </button>
+                <input type="file" id="file-input-import-folder" webkitdirectory directory mozdirectory class="hidden" onchange="importProjectFiles(event.target.files)">
                 <button onclick="exportProject()" title="Save Project (.json)" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
                     <i class="fa-solid fa-floppy-disk"></i>
                 </button>
                 <button onclick="exportStandaloneHTML()" title="Export App (Standalone HTML)" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-brand-600 dark:text-brand-400 font-medium text-xs flex items-center space-x-1">
                     <i class="fa-solid fa-file-code text-sm"></i>
                     <span class="hidden md:inline">Export Web App</span>
+                </button>
+                <button onclick="exportPWABundle()" title="匯出可自架的 PWA 安裝包（.zip：index.html + manifest.webmanifest + sw.js + 圖示），上傳到任何網站空間即可真正安裝" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-brand-600 dark:text-brand-400 font-medium text-xs flex items-center space-x-1">
+                    <i class="fa-solid fa-box-archive text-sm"></i>
+                    <span class="hidden md:inline">匯出 PWA 安裝包</span>
                 </button>
             </div>
         </div>
@@ -145,6 +155,8 @@
         <!-- Right Header Actions (Preview / Run) -->
         <div class="flex items-center space-x-2">
             <button onclick="openPlugins()" title="Plugins" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"><i class="fa-solid fa-puzzle-piece"></i></button>
+            <button onclick="installPWA()" title="把 NeoStudio 安裝到桌面/主畫面（本次瀏覽階段快速安裝）" class="fa-solid fa-puzzle-piece"></button>
+            <button onclick="exportSelfPWABundle()" title="匯出 NeoStudio 本身為可自架的 PWA 安裝包（.zip），上傳到你自己的網站空間即可真正安裝整個編輯平台" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"><i class="fa-solid fa-layer-group"></i></button>
             <button onclick="toggleDarkMode()" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300">
                 <i id="dark-icon" class="fa-solid fa-moon"></i>
             </button>
@@ -1308,6 +1320,93 @@
             const q = CSS.escape(n);
             return document.querySelector(`#player-viewport [data-name="${q}"], #player-viewport [data-id="${q}"]`);
         }
+        /* ===== PWA support (installable manifest + icons + best-effort service worker) ===== */
+        function makeAppIcon(letter, bg, size) {
+            const c = document.createElement('canvas'); c.width = c.height = size;
+            const ctx = c.getContext('2d');
+            const r = size * 0.22;
+            ctx.fillStyle = bg;
+            ctx.beginPath();
+            ctx.moveTo(r, 0); ctx.arcTo(size, 0, size, size, r); ctx.arcTo(size, size, 0, size, r); ctx.arcTo(0, size, 0, 0, r); ctx.arcTo(0, 0, size, 0, r);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#ffffff'; ctx.font = `bold ${Math.round(size * 0.52)}px system-ui, sans-serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText((letter || 'N').toUpperCase().slice(0, 1), size / 2, size * 0.56);
+            return c.toDataURL('image/png');
+        }
+        function manifestHref(manifest) { return 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(manifest)); }
+        function buildManifest(name, color, icon192, icon512) {
+            return { name, short_name: name.slice(0, 12), start_url: location.href.split('#')[0].split('?')[0], scope: location.href.split('#')[0].split('?')[0], display: 'standalone', orientation: 'any', background_color: '#0b1220', theme_color: color, icons: [{ src: icon192, sizes: '192x192', type: 'image/png' }, { src: icon512, sizes: '512x512', type: 'image/png' }] };
+        }
+        function installAppHead(doc, name, color) {
+            const icon192 = makeAppIcon(name, color, 192), icon512 = makeAppIcon(name, color, 512);
+            const add = (tag, attrs) => { const el = doc.createElement(tag); Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v)); el.setAttribute('data-pwa-auto', '1'); doc.head.appendChild(el); return el; };
+            add('link', { rel: 'manifest', href: manifestHref(buildManifest(name, color, icon192, icon512)) });
+            add('link', { rel: 'apple-touch-icon', href: icon192 });
+            add('link', { rel: 'icon', href: icon192 });
+            add('meta', { name: 'apple-mobile-web-app-capable', content: 'yes' });
+            add('meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' });
+            add('meta', { name: 'apple-mobile-web-app-title', content: name.slice(0, 12) });
+            add('meta', { name: 'mobile-web-app-capable', content: 'yes' });
+            add('meta', { name: 'theme-color', content: color });
+            try {
+                const swCode = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>self.clients.claim());self.addEventListener('fetch',e=>{});";
+                if ('serviceWorker' in navigator) navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode], { type: 'text/javascript' }))).catch(() => {});
+            } catch (e) {}
+        }
+        let _deferredPWA = null;
+        window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); _deferredPWA = e; });
+        function installPWA() {
+            if (_deferredPWA) { _deferredPWA.prompt(); _deferredPWA.userChoice.finally(() => { _deferredPWA = null; }); return; }
+            const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            alert(ios
+                ? '在 Safari 底部（或分享列）按「分享」圖示 ⬆️，選擇「加入主畫面」，即可像 App 一樣從桌面開啟。'
+                : '瀏覽器可能未偵測到可安裝狀態，或已經安裝過。可試著點瀏覽器網址列右側的安裝圖示，或打開瀏覽器選單選擇「安裝應用程式 / 新增至主畫面」。');
+        }
+        if (!window.__NEOSTUDIO_SKIP_PWA_HEAD__) installAppHead(document, 'NeoStudio', '#0f766e');
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+        async function exportSelfPWABundle() {
+            if (typeof JSZip === 'undefined') { alert('打包工具（JSZip）尚未載入完成，請稍候幾秒再試一次，或檢查網路連線。'); return; }
+            const name = 'NeoStudio', color = '#0f766e';
+            const icon192Url = makeAppIcon(name, color, 192), icon512Url = makeAppIcon(name, color, 512);
+            const [icon192Blob, icon512Blob] = await Promise.all([dataUrlToBlob(icon192Url), dataUrlToBlob(icon512Url)]);
+            const manifest = { name, short_name: name, start_url: './index.html', scope: './', display: 'standalone', orientation: 'any', background_color: '#0b1220', theme_color: color, icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }, { src: 'icon-512.png', sizes: '512x512', type: 'image/png' }] };
+            const swJs = `const CACHE = 'neostudio-v1';
+const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))); self.skipWaiting(); });
+self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
+self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return res; }).catch(() => r))); });`;
+            const clone = document.documentElement.cloneNode(true);
+            clone.querySelectorAll('[data-pwa-auto]').forEach(n => n.remove());
+            const head = clone.querySelector('head');
+            head.insertAdjacentHTML('afterbegin',
+                `<script>window.__NEOSTUDIO_SKIP_PWA_HEAD__=true;<\/script>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="${color}">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="${name}">
+<meta name="mobile-web-app-capable" content="yes">`);
+            const indexHtml = '<!DOCTYPE html>\n' + clone.outerHTML;
+            const zip = new JSZip();
+            zip.file('index.html', indexHtml);
+            zip.file('manifest.webmanifest', JSON.stringify(manifest, null, 2));
+            zip.file('sw.js', swJs);
+            zip.file('icon-192.png', icon192Blob);
+            zip.file('icon-512.png', icon512Blob);
+            zip.file('README.txt', '把這個資料夾裡所有檔案（保持同一層）上傳到任何支援 HTTPS 的靜態網站空間\n（例如 GitHub Pages、Netlify、Vercel，或你自己的主機），\n用瀏覽器打開 index.html 對應的網址，即可看到「安裝為 App」的按鈕或瀏覽器原生的安裝提示。\n這個安裝包是 NeoStudio 編輯平台本身，安裝後就像一個獨立的桌面/手機 App 可以直接打開來編輯專案。\n\n若用 file:// 直接雙擊開啟本機檔案，或放在不支援 HTTPS 的環境，\n瀏覽器基於安全限制不會提供安裝功能，這是瀏覽器的限制，與本檔案內容無關。');
+            const blob = await zip.generateAsync({ type: 'blob' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'neostudio_pwa_bundle.zip';
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        }
+
+
         function mkPlugins() {
             return { actions: {}, controls: {}, register(p) {
                 for (const [k, f] of Object.entries(p.actions || {})) this.actions[k.toLowerCase()] = f;
@@ -1556,10 +1655,16 @@
             return { project: { title: H.Title || 'NeoBook Import', width: +H.ScreenWidth || 800, height: +H.ScreenHeight || 600, pages, variables }, badTypes: [...badTypes], badCmds: [...badCmds], refs: [...refs] };
         }
 
-        async function importProject(event) {
-            const files = [...event.target.files]; event.target.value = '';
+        async function importProjectFiles(fileList) {
+            const files = [...fileList];
+            document.getElementById('file-input-import').value = '';
+            document.getElementById('file-input-import-folder').value = '';
             const isImg = f => /^image\//.test(f.type) || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(f.name);
-            const main = files.find(f => !isImg(f)), assets = {};
+            const isMain = f => /\.(pub|json)$/i.test(f.name);
+            const mains = files.filter(isMain);
+            if (files.length && !mains.length && !files.some(isImg)) { alert('這個資料夾裡沒有找到 .pub 或 .json 專案檔。'); return; }
+            const main = mains.length > 1 ? mains.sort((a, b) => a.name.length - b.name.length)[0] : mains[0];
+            const assets = {};
             for (const f of files.filter(isImg)) assets[f.name.toLowerCase()] = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); });
             try {
                 let note = '', refs = [];
@@ -1575,22 +1680,88 @@
                     p.pages.forEach((pg, i) => { pg.id = pg.id || uid('page'); pg.name = pg.name || 'Page ' + (i + 1); pg.elements = pg.elements || []; });
                     project = p; activePageId = p.pages[0].id; selectedElementId = null;
                     (project.plugins || []).forEach(loadPlugin);
-                }
+                } else if (!Object.keys(assets).length) { return; }
                 project.assets = Object.assign(project.assets || {}, assets);
                 const miss = refs.filter(n => !project.assets[n.toLowerCase()]);
-                if (miss.length) note += `\n缺少圖檔（請重新匯入時和 .pub 一起多選）：${miss.join(', ')}`;
+                if (miss.length) note += `\n缺少圖檔（請改用「選擇整個資料夾匯入」，或和 .pub 一起多選這些檔案）：${miss.join(', ')}`;
+                else if (mains.length > 1) note += `\n資料夾裡有多個專案檔，已匯入：${main.name}`;
                 renderPagesList(); renderCanvas(); renderVariablesList(); updatePropertiesPanel(); fitZoom();
                 if (note) alert(note);
             } catch (err) { alert("Invalid NeoBook Project File."); }
         }
 
-        function exportStandaloneHTML() {
+        async function dataUrlToBlob(dataUrl) { return (await fetch(dataUrl)).blob(); }
+        async function exportPWABundle() {
+            if (typeof JSZip === 'undefined') { alert('PWA 打包工具（JSZip）尚未載入完成，請稍候幾秒再試一次，或檢查網路連線。'); return; }
+            const title = project.title || 'App';
+            const slug = title.toLowerCase().replace(/[^\w\u4e00-\u9fff]+/g, '_').replace(/^_+|_+$/g, '') || 'app';
+            const color = '#0284c7';
+            const icon192Url = makeAppIcon(title, color, 192), icon512Url = makeAppIcon(title, color, 512);
+            const [icon192Blob, icon512Blob] = await Promise.all([dataUrlToBlob(icon192Url), dataUrlToBlob(icon512Url)]);
+
+            const manifest = { name: title, short_name: title.slice(0, 12), start_url: './index.html', scope: './', display: 'standalone', orientation: 'any', background_color: '#0b1220', theme_color: color, icons: [{ src: 'icon-192.png', sizes: '192x192', type: 'image/png' }, { src: 'icon-512.png', sizes: '512x512', type: 'image/png' }] };
+
+            const swJs = `const CACHE = '${slug}-v1';
+const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))); self.skipWaiting(); });
+self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
+self.addEventListener('fetch', e => { e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).then(res => { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return res; }).catch(() => r))); });`;
+
             const rt = [mkPlugins, coreActions, numExpr, assetUrl, esc, getFlexJustify, subVars, neoApi, refreshTpl, findRuntimeEl, executeNeoScript, runSwitchToPage].map(f => f.toString()).join('\n');
             const js = `const project = ${JSON.stringify(project).replace(/</g, '\\u003c')};\n${rt}\n` +
                 `var NeoPlugins=mkPlugins();NeoPlugins.register({actions:coreActions()});\n${(project.plugins || []).map(c => `try{(function(NeoPlugins){${c.replace(/<\//g, '<\\/')}})(NeoPlugins)}catch(e){}`).join('\n')}\n` +
+                `if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});}\n` +
+                `var _deferredPWA=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_deferredPWA=e;document.getElementById('pwa-install-btn').style.display='flex';});\n` +
+                `function installPWA(){if(_deferredPWA){_deferredPWA.prompt();_deferredPWA.userChoice.finally(()=>{_deferredPWA=null});return}var ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);alert(ios?'在 Safari 按「分享」圖示，選擇「加入主畫面」即可安裝。':'請點瀏覽器網址列的安裝圖示，或用選單的「安裝應用程式／新增至主畫面」。')}\n` +
+                `(function(){const vp=document.getElementById('player-viewport');const fit=()=>{vp.style.transform='scale('+Math.min(1,(innerWidth-16)/project.width,(innerHeight-16)/project.height)+')'};addEventListener('resize',fit);fit();runSwitchToPage(project.pages[0].id)})();`;
+
+            const indexHtml = `<!DOCTYPE html>
+<html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>${esc(title)}</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="${color}">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="${esc(title.slice(0, 12))}">
+<meta name="mobile-web-app-capable" content="yes">
+<script src="https://cdn.tailwindcss.com"><\/script>
+<script>tailwind.config={theme:{extend:{colors:{brand:{50:'#f0f9ff',100:'#e0f2fe',500:'#0284c7',600:'#0369a1',700:'#075985'}}}}}<\/script>
+<style>.page-transition{transition:all .35s cubic-bezier(.4,0,.2,1)}.trans-fade-enter{opacity:0}.trans-fade-active{opacity:1}</style>
+</head>
+<body class="bg-gray-900 h-screen w-screen flex items-center justify-center m-0 overflow-hidden">
+<div id="player-viewport" class="relative bg-white shadow-2xl overflow-hidden" style="width:${project.width}px;height:${project.height}px"></div>
+<button id="pwa-install-btn" onclick="installPWA()" style="display:none" class="fixed bottom-4 right-4 z-50 items-center gap-2 px-4 py-2 rounded-full bg-brand-600 text-white text-sm font-medium shadow-lg hover:bg-brand-700">⬇ 安裝為 App</button>
+<script>${js}<\/script>
+</body></html>`;
+
+            const zip = new JSZip();
+            zip.file('index.html', indexHtml);
+            zip.file('manifest.webmanifest', JSON.stringify(manifest, null, 2));
+            zip.file('sw.js', swJs);
+            zip.file('icon-192.png', icon192Blob);
+            zip.file('icon-512.png', icon512Blob);
+            zip.file('README.txt', '把這個資料夾裡所有檔案（保持同一層、不要放進子資料夾）上傳到任何支援 HTTPS 的靜態網站空間\n（例如 GitHub Pages、Netlify、Vercel，或你自己的主機），\n用瀏覽器打開 index.html 對應的網址，即可看到「安裝為 App」的按鈕或瀏覽器原生的安裝提示。\n\n若用 file:// 直接雙擊開啟本機檔案，或放在不支援 HTTPS 的環境，\n瀏覽器基於安全限制不會提供安裝功能，這是瀏覽器的限制，與本檔案內容無關。');
+            const blob = await zip.generateAsync({ type: 'blob' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${slug}_pwa_bundle.zip`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        }
+
+        function exportStandaloneHTML() {
+            const rt = [mkPlugins, coreActions, numExpr, assetUrl, esc, getFlexJustify, subVars, neoApi, refreshTpl, findRuntimeEl, executeNeoScript, runSwitchToPage, makeAppIcon, manifestHref, buildManifest, installAppHead].map(f => f.toString()).join('\n');
+            const appColor = '#0284c7';
+            const js = `const project = ${JSON.stringify(project).replace(/</g, '\\u003c')};\n${rt}\n` +
+                `var NeoPlugins=mkPlugins();NeoPlugins.register({actions:coreActions()});\n${(project.plugins || []).map(c => `try{(function(NeoPlugins){${c.replace(/<\//g, '<\\/')}})(NeoPlugins)}catch(e){}`).join('\n')}\n` +
+                `installAppHead(document, ${JSON.stringify(project.title || 'App')}, ${JSON.stringify(appColor)});\n` +
+                `var _deferredPWA=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_deferredPWA=e;document.getElementById('pwa-install-btn').style.display='flex';});\n` +
+                `function installPWA(){if(_deferredPWA){_deferredPWA.prompt();_deferredPWA.userChoice.finally(()=>{_deferredPWA=null});return}var ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);alert(ios?'在 Safari 按「分享」圖示，選擇「加入主畫面」即可安裝。':'請點瀏覽器網址列的安裝圖示，或用選單的「安裝應用程式／新增至主畫面」。')}\n` +
                 `(function(){const vp=document.getElementById('player-viewport');const fit=()=>{vp.style.transform='scale('+Math.min(1,(innerWidth-16)/project.width,(innerHeight-16)/project.height)+')'};addEventListener('resize',fit);fit();runSwitchToPage(project.pages[0].id)})();`;
             const html = `<!DOCTYPE html>
-<html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>${esc(project.title)}</title>
 <script src="https://cdn.tailwindcss.com"><\/script>
 <script>tailwind.config={theme:{extend:{colors:{brand:{50:'#f0f9ff',100:'#e0f2fe',500:'#0284c7',600:'#0369a1',700:'#075985'}}}}}<\/script>
@@ -1598,6 +1769,7 @@
 </head>
 <body class="bg-gray-900 h-screen w-screen flex items-center justify-center m-0 overflow-hidden">
 <div id="player-viewport" class="relative bg-white shadow-2xl overflow-hidden" style="width:${project.width}px;height:${project.height}px"></div>
+<button id="pwa-install-btn" onclick="installPWA()" style="display:none" class="fixed bottom-4 right-4 z-50 items-center gap-2 px-4 py-2 rounded-full bg-brand-600 text-white text-sm font-medium shadow-lg hover:bg-brand-700">⬇ 安裝為 App</button>
 <script>${js}<\/script>
 </body></html>`;
             const a = document.createElement('a');
