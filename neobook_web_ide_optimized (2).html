@@ -111,10 +111,14 @@
                 <button onclick="createNewProject()" title="New Project" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
                     <i class="fa-solid fa-file"></i>
                 </button>
-                <button onclick="triggerImportProject()" title="Open Project" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
+                <button onclick="triggerImportProject()" title="開啟專案（可多選 .pub/.json 與圖檔）" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
                     <i class="fa-solid fa-folder-open"></i>
                 </button>
-                <input type="file" id="file-input-import" accept=".json,.pub,image/*" multiple class="hidden" onchange="importProject(event)">
+                <input type="file" id="file-input-import" accept=".json,.pub,image/*" multiple class="hidden" onchange="importProjectFiles(event.target.files)">
+                <button onclick="document.getElementById('file-input-import-folder').click()" title="選擇整個資料夾匯入（自動帶入同資料夾圖檔）" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
+                    <i class="fa-solid fa-folder-tree"></i>
+                </button>
+                <input type="file" id="file-input-import-folder" webkitdirectory directory mozdirectory class="hidden" onchange="importProjectFiles(event.target.files)">
                 <button onclick="exportProject()" title="Save Project (.json)" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200">
                     <i class="fa-solid fa-floppy-disk"></i>
                 </button>
@@ -145,6 +149,7 @@
         <!-- Right Header Actions (Preview / Run) -->
         <div class="flex items-center space-x-2">
             <button onclick="openPlugins()" title="Plugins" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"><i class="fa-solid fa-puzzle-piece"></i></button>
+            <button onclick="installPWA()" title="把 NeoStudio 安裝到桌面/主畫面" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"><i class="fa-solid fa-arrow-down-to-bracket"></i></button>
             <button onclick="toggleDarkMode()" class="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300">
                 <i id="dark-icon" class="fa-solid fa-moon"></i>
             </button>
@@ -174,40 +179,40 @@
 
             <!-- Controls Grid Palette -->
             <div class="p-3 grid grid-cols-2 gap-2 border-b border-gray-200 dark:border-gray-700 overflow-y-auto max-h-56">
-                <button onclick="addNewElement('text')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                <div class="relative"><button onclick="addNewElement('text')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
                     <i class="fa-solid fa-font text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
                     <span class="text-xs font-medium">Text / Label</span>
-                </button>
-                <button onclick="addNewElement('button')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                </button><button onclick="event.stopPropagation();showElementHelp('text')" title="使用說明" class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-400 hover:bg-brand-600 text-white text-[10px] leading-4 text-center shadow">?</button></div>
+                <div class="relative"><button onclick="addNewElement('button')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
                     <i class="fa-solid fa-rectangle-ad text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
                     <span class="text-xs font-medium">Button</span>
-                </button>
-                <button onclick="addNewElement('input')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                </button><button onclick="event.stopPropagation();showElementHelp('button')" title="使用說明" class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-400 hover:bg-brand-600 text-white text-[10px] leading-4 text-center shadow">?</button></div>
+                <div class="relative"><button onclick="addNewElement('input')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
                     <i class="fa-solid fa-i-cursor text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
                     <span class="text-xs font-medium">Text Field</span>
-                </button>
-                <button onclick="addNewElement('image')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                </button><button onclick="event.stopPropagation();showElementHelp('input')" title="使用說明" class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-400 hover:bg-brand-600 text-white text-[10px] leading-4 text-center shadow">?</button></div>
+                <div class="relative"><button onclick="addNewElement('image')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
                     <i class="fa-solid fa-image text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
                     <span class="text-xs font-medium">Image</span>
-                </button>
-                <button onclick="addNewElement('checkbox')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                </button><button onclick="event.stopPropagation();showElementHelp('image')" title="使用說明" class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-400 hover:bg-brand-600 text-white text-[10px] leading-4 text-center shadow">?</button></div>
+                <div class="relative"><button onclick="addNewElement('checkbox')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
                     <i class="fa-solid fa-square-check text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
                     <span class="text-xs font-medium">Checkbox</span>
-                </button>
-                <button onclick="addNewElement('media')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                </button><button onclick="event.stopPropagation();showElementHelp('checkbox')" title="使用說明" class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-400 hover:bg-brand-600 text-white text-[10px] leading-4 text-center shadow">?</button></div>
+                <div class="relative"><button onclick="addNewElement('media')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
                     <i class="fa-solid fa-film text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
                     <span class="text-xs font-medium">Media Player</span>
-                </button>
-                <button onclick="addNewElement('shape')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                </button><button onclick="event.stopPropagation();showElementHelp('media')" title="使用說明" class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-400 hover:bg-brand-600 text-white text-[10px] leading-4 text-center shadow">?</button></div>
+                <div class="relative"><button onclick="addNewElement('shape')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
                     <i class="fa-solid fa-shapes text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
                     <span class="text-xs font-medium">Shape</span>
-                </button>
-                <button onclick="addNewElement('radio')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg flex flex-col items-center space-y-1"><i class="fa-regular fa-circle-dot text-brand-600"></i><span class="text-xs font-medium">Radio</span></button>
-                <button onclick="addNewElement('webview')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg flex flex-col items-center space-y-1"><i class="fa-solid fa-globe text-brand-600"></i><span class="text-xs font-medium">WebView</span></button>
-                <button onclick="addNewElement('dropdown')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
+                </button><button onclick="event.stopPropagation();showElementHelp('shape')" title="使用說明" class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-400 hover:bg-brand-600 text-white text-[10px] leading-4 text-center shadow">?</button></div>
+                <div class="relative"><button onclick="addNewElement('radio')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg flex flex-col items-center space-y-1"><i class="fa-regular fa-circle-dot text-brand-600"></i><span class="text-xs font-medium">Radio</span></button><button onclick="event.stopPropagation();showElementHelp('radio')" title="使用說明" class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-400 hover:bg-brand-600 text-white text-[10px] leading-4 text-center shadow">?</button></div>
+                <div class="relative"><button onclick="addNewElement('webview')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg flex flex-col items-center space-y-1"><i class="fa-solid fa-globe text-brand-600"></i><span class="text-xs font-medium">WebView</span></button><button onclick="event.stopPropagation();showElementHelp('webview')" title="使用說明" class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-400 hover:bg-brand-600 text-white text-[10px] leading-4 text-center shadow">?</button></div>
+                <div class="relative"><button onclick="addNewElement('dropdown')" class="p-2.5 bg-gray-50 dark:bg-gray-700/50 hover:bg-brand-50 dark:hover:bg-brand-900/30 border border-gray-200 dark:border-gray-600 rounded-lg text-left flex flex-col items-center justify-center gap-1 hover:border-brand-500 transition group">
                     <i class="fa-solid fa-caret-down text-brand-600 dark:text-brand-400 group-hover:scale-110 transition"></i>
                     <span class="text-xs font-medium">Dropdown</span>
-                </button>
+                </button><button onclick="event.stopPropagation();showElementHelp('dropdown')" title="使用說明" class="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-400 hover:bg-brand-600 text-white text-[10px] leading-4 text-center shadow">?</button></div>
             </div>
 
             <!-- Page Management Panel -->
@@ -287,7 +292,7 @@
 
                 <div id="properties-form" class="hidden space-y-4 text-xs">
                     <div class="flex items-center justify-between border-b pb-2 dark:border-gray-700">
-                        <span class="font-bold text-sm" id="prop-elem-type">Control</span>
+                        <span class="font-bold text-sm flex items-center gap-1.5"><span id="prop-elem-type">Control</span><button onclick="showElementHelp(getCurrentPage().elements.find(e=>e.id===selectedElementId).type)" title="使用說明" class="w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-600 hover:bg-brand-600 hover:text-white text-[10px] leading-4 text-center">?</button></span>
                         <span class="text-gray-400 text-xs" id="prop-elem-id">#id</span>
                     </div>
 
@@ -298,8 +303,34 @@
                     </div>
 
                     <div id="prop-text-container" class="space-y-2">
-                        <label class="block font-medium">Text Content / Value</label>
+                        <label class="block font-medium" id="prop-text-label">Text Content / Value</label>
                         <textarea id="prop-text" rows="2" oninput="updateSelectedElementProp('text', this.value)" class="w-full px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 dark:bg-gray-700 focus:outline-none focus:border-brand-500"></textarea>
+                    </div>
+
+                    <!-- Image Picker (image elements) -->
+                    <div id="prop-image-container" class="hidden space-y-2">
+                        <label class="block font-medium">圖片</label>
+                        <img id="prop-image-preview" class="w-full h-28 object-cover rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900">
+                        <div class="flex gap-2">
+                            <label class="flex-1 text-center px-2 py-1.5 rounded bg-brand-600 hover:bg-brand-700 text-white cursor-pointer">
+                                更換圖片
+                                <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(this.files[0])">
+                            </label>
+                            <button onclick="clearImageProp()" class="px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600">清除</button>
+                        </div>
+                    </div>
+
+                    <!-- Icon Picker (button elements, optional) -->
+                    <div id="prop-icon-container" class="hidden space-y-2">
+                        <label class="block font-medium">按鈕圖示（選用，留空則用純色底）</label>
+                        <div class="flex items-center gap-2">
+                            <img id="prop-icon-preview" class="w-14 h-10 object-cover rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900 hidden">
+                            <label class="flex-1 text-center px-2 py-1.5 rounded bg-brand-600 hover:bg-brand-700 text-white cursor-pointer text-xs">
+                                上傳圖示
+                                <input type="file" accept="image/*" class="hidden" onchange="handleImageUpload(this.files[0], 'img')">
+                            </label>
+                            <button onclick="clearImageProp('img')" class="px-2 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-xs">清除</button>
+                        </div>
                     </div>
 
                     <!-- Variable Binding -->
@@ -361,7 +392,7 @@
                     <div class="border-t pt-3 dark:border-gray-700">
                         <button onclick="openScriptEditorForSelectedElement()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg shadow transition flex items-center justify-center space-x-2">
                             <i class="fa-solid fa-bolt"></i>
-                            <span>Edit NeoScript Actions</span>
+                            <span id="prop-script-btn-label">Edit NeoScript Actions</span>
                         </button>
                     </div>
                 </div>
@@ -382,6 +413,37 @@
         </aside>
     </div>
 
+    <!-- DIALOG: ELEMENT USAGE HELP -->
+    <dialog id="dlg-help" class="rounded-xl p-0 w-[min(480px,94vw)] bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-2xl">
+        <div class="px-4 py-3 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex justify-between items-center rounded-t-xl">
+            <h3 class="font-bold text-sm flex items-center gap-2" id="help-title"><i class="fa-solid fa-circle-question text-brand-600"></i></h3>
+            <button onclick="document.getElementById('dlg-help').close()" class="text-gray-400 hover:text-gray-600 dark:hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <div class="p-4 space-y-3 text-xs max-h-[70vh] overflow-y-auto">
+            <p id="help-desc" class="text-gray-600 dark:text-gray-300 leading-relaxed"></p>
+            <div>
+                <div class="font-semibold text-gray-400 mb-1">範例值 / 用法</div>
+                <pre id="help-example" class="bg-gray-900 text-green-400 rounded p-2 overflow-x-auto whitespace-pre-wrap"></pre>
+            </div>
+            <div id="help-tips-wrap" class="hidden">
+                <div class="font-semibold text-gray-400 mb-1">小提醒</div>
+                <ul id="help-tips" class="list-disc list-inside text-gray-600 dark:text-gray-300 space-y-0.5"></ul>
+            </div>
+        </div>
+        <div class="px-4 py-3 border-t border-gray-200 dark:border-gray-600 flex justify-end">
+            <button onclick="insertHelpExample()" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded text-xs font-medium">加入一個範例元件到目前頁面</button>
+        </div>
+    </dialog>
+
+    <!-- DIALOG: DOUBLE-CLICK ELEMENT PROPERTIES POPUP -->
+    <dialog id="dlg-elem-props" class="rounded-xl p-0 w-[min(380px,94vw)] bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 border border-gray-200 dark:border-gray-700 shadow-2xl">
+        <div class="px-4 py-3 bg-gray-100 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600 flex justify-between items-center rounded-t-xl">
+            <h3 class="font-bold text-sm flex items-center gap-2"><i class="fa-solid fa-sliders text-brand-600"></i>元件屬性</h3>
+            <button onclick="document.getElementById('dlg-elem-props').close()" class="text-gray-400 hover:text-gray-600 dark:hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+        </div>
+        <div id="elem-props-slot" class="max-h-[75vh] overflow-y-auto"></div>
+    </dialog>
+
     <!-- MODAL: NEOSCRIPT ACTION BUILDER & EDITOR -->
     <div id="modal-script-editor" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col h-[520px]">
@@ -399,15 +461,41 @@
             <!-- Editor Body -->
             <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
                 <!-- Action Helper Buttons Side Menu -->
-                <div class="w-full md:w-48 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 p-2 overflow-y-auto space-y-1 text-xs">
-                    <div class="font-semibold text-gray-400 px-2 py-1">Insert Command</div>
-                    <button onclick="insertScriptCommand('GotoPage')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">GotoPage</button>
-                    <button onclick="insertScriptCommand('SetVar')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">SetVar</button>
-                    <button onclick="insertScriptCommand('Alert')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">Alert / Msg</button>
-                    <button onclick="insertScriptCommand('ShowObject')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">ShowObject</button>
-                    <button onclick="insertScriptCommand('HideObject')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">HideObject</button>
-                    <button onclick="insertScriptCommand('PlayAudio')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">PlayAudio</button>
-                    <button onclick="insertScriptCommand('If')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300">If ... EndIf</button>
+                <div class="w-full md:w-52 bg-gray-50 dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 p-2 overflow-y-auto space-y-3 text-xs">
+                    <p class="text-[11px] text-gray-400 px-2">點一下功能，再依提示填寫，會自動組成正確的指令。</p>
+                    <div>
+                        <div class="font-semibold text-gray-400 px-2 py-1">📄 換頁</div>
+                        <button onclick="insertScriptCommand('GotoPage')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">跳到指定頁面</button>
+                        <button onclick="insertScriptCommand('GotoNextPage')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">跳到下一頁</button>
+                        <button onclick="insertScriptCommand('GotoPrevPage')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">跳到上一頁</button>
+                    </div>
+                    <div>
+                        <div class="font-semibold text-gray-400 px-2 py-1">🧩 物件</div>
+                        <button onclick="insertScriptCommand('ShowObject')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">顯示某個物件</button>
+                        <button onclick="insertScriptCommand('HideObject')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">隱藏某個物件</button>
+                        <button onclick="insertScriptCommand('SetObjectFill')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">改變物件顏色</button>
+                        <button onclick="insertScriptCommand('MoveObject')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">移動物件位置</button>
+                        <button onclick="insertScriptCommand('FocusObject')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">把游標移到物件</button>
+                    </div>
+                    <div>
+                        <div class="font-semibold text-gray-400 px-2 py-1">🔢 變數與判斷</div>
+                        <button onclick="insertScriptCommand('SetVar')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">設定變數的值</button>
+                        <button onclick="insertScriptCommand('Math')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">計算並存到變數</button>
+                        <button onclick="insertScriptCommand('If')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">條件判斷 If...EndIf</button>
+                    </div>
+                    <div>
+                        <div class="font-semibold text-gray-400 px-2 py-1">💬 訊息與媒體</div>
+                        <button onclick="insertScriptCommand('Alert')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">跳出提示訊息</button>
+                        <button onclick="insertScriptCommand('PlayAudio')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">播放聲音</button>
+                        <button onclick="insertScriptCommand('OpenURL')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">開啟網頁</button>
+                        <button onclick="insertScriptCommand('Delay')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">延遲等待</button>
+                    </div>
+                    <div>
+                        <div class="font-semibold text-gray-400 px-2 py-1">🌐 進階</div>
+                        <button onclick="insertScriptCommand('HttpGet')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">讀取網路資料</button>
+                        <button onclick="insertScriptCommand('Call')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">呼叫自訂函式</button>
+                        <button onclick="insertScriptCommand('Exit')" class="w-full text-left px-2 py-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-800">結束程式</button>
+                    </div>
                 </div>
 
                 <!-- Code Input Textarea -->
@@ -721,6 +809,11 @@
                     selectElement(elem.id);
                     startDragging(e, elem);
                 });
+                elemDiv.addEventListener('dblclick', (e) => {
+                    e.stopPropagation();
+                    selectElement(elem.id);
+                    openElementPropsPopup();
+                });
 
                 // Attach Resize Handles if Selected
                 if (selectedElementId === elem.id) {
@@ -735,12 +828,15 @@
             switch (elem.type) {
                 case 'text':
                     return `<div class="w-full h-full flex items-center p-1" style="justify-content: ${getFlexJustify(elem.align)}">${esc(elem.text) || 'Text Box'}</div>`;
-                case 'button':
-                    return `<button class="w-full h-full bg-transparent text-white font-medium rounded shadow flex items-center justify-center px-2 pointer-events-none">${esc(elem.text) || 'Button'}</button>`;
+                case 'button': {
+                    const iu = assetUrl(elem.img || '');
+                    const st = iu ? `background:url('${iu}') center/100% 100% no-repeat` : '';
+                    return `<button class="w-full h-full bg-transparent text-white font-medium rounded shadow flex items-center justify-center px-2 pointer-events-none" style="${st}">${iu ? '' : (esc(elem.text) || 'Button')}</button>`;
+                }
                 case 'input':
                     return `<input type="text" placeholder="${esc(elem.text) || 'Input...'}" value="${esc(elem.variable ? (project.variables[elem.variable] || '') : '')}" class="w-full h-full px-2 py-1 border rounded bg-white text-gray-800 pointer-events-none">`;
                 case 'image':
-                    return `<img src="${esc(elem.text) || 'https://placehold.co/200x150/e2e8f0/64748b?text=Image'}" class="w-full h-full object-cover rounded pointer-events-none" onerror="this.src='https://placehold.co/200x150/e2e8f0/64748b?text=Image'">`;
+                    return `<img src="${esc(assetUrl(elem.text)) || placeholderSVG('點兩下更換圖片')}" class="w-full h-full object-cover rounded pointer-events-none">`;
                 case 'radio':
                     return `<label class="flex items-center space-x-2 p-1 pointer-events-none"><input type="radio"> <span>${esc(elem.text) || 'Radio'}</span></label>`;
                 case 'checkbox':
@@ -770,6 +866,52 @@
         /* ==========================================================================
            5. ELEMENT CREATION & MANIPULATION
            ========================================================================== */
+        const ELEMENT_DEFAULT_TEXT = {
+            text: 'Sample Text',
+            button: 'Click Me',
+            media: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+            webview: 'https://example.com',
+            dropdown: 'Option 1,Option 2,Option 3',
+            checkbox: 'Checkbox',
+            radio: 'Radio Option'
+        };
+        const ELEMENT_HELP = {
+            text: { title: '文字 / 標籤', desc: '純顯示用的文字方塊，可用 [變數名] 顯示變數目前的值，變數更新時畫面會自動跟著換字。', example: '文字內容：\n歡迎你，[Name]！\n分數：[Score]', tips: ['不能點擊，若要能點擊請改用「按鈕」。', '對齊與字級可在屬性面板調整。'] },
+            button: { title: '按鈕', desc: '可點擊並觸發一段 NeoScript 動作，例如換頁、改變其他物件、跳訊息等。也可以上傳一張圖片當按鈕外觀。', example: '雙擊按鈕開屬性窗，按「設定這個按鈕要做什麼」，\n例如選「跳到指定頁面」→ GotoPage "Page 2"', tips: ['文字和圖片可以只選一種，兩者都設定時圖片會蓋掉文字。'] },
+            input: { title: '文字輸入框', desc: '讓使用者輸入文字，內容會即時寫入「Bound Variable」設定的變數，適合做表單、答題欄。', example: '變數欄位填：[Answer]\n之後其他地方可用 [Answer] 取得使用者輸入的內容', tips: ['高度大於 40px 會自動變成多行輸入。'] },
+            image: { title: '圖片', desc: '顯示一張圖片。新增時會先給一張預留示意圖，之後在屬性面板按「更換圖片」上傳你自己的圖片即可。', example: '屬性面板 → 更換圖片 → 選擇本機檔案', tips: ['也支援貼外部圖片網址（在進階/匯入的專案 JSON 裡設定 text 為網址）。'] },
+            checkbox: { title: '核取方塊', desc: '勾選狀態會寫入 Bound Variable，值為文字 "true" 或 "false"，可搭配 If 判斷使用。', example: '變數欄位填：[Agree]\nIf "[Agree]" "=" "true"\n  Alert "感謝同意條款"\nEndIf', tips: [] },
+            media: { title: '媒體播放器（影片／音樂）', desc: '播放影片或音樂檔案。網址結尾是 .mp4/.webm/.ogv 會顯示成影片播放器，其餘（如 .mp3）會顯示成音樂播放器。新增時已內建一段範例影片，可直接按預覽測試。', example: '文字內容（網址）：\nhttps://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4\n\n音樂範例：\nhttps://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3', tips: ['請使用可公開存取、允許跨網域嵌入的網址。', '本機檔案請先上傳到你自己的網路空間再貼網址。'] },
+            shape: { title: '形狀 / 方塊', desc: '單純的裝飾用方塊或框線，可設定填色、外框顏色與粗細，常用來當底板或分隔線。', example: '（無文字內容，用填色/外框顏色屬性設計外觀）', tips: [] },
+            radio: { title: '單選鈕', desc: '多個單選鈕填同一個 Bound Variable，就會自動變成一組，選中時會把該按鈕的「文字」寫入變數。', example: '三個單選鈕都填變數 [Level]，文字分別填：\n初級 / 中級 / 高級\n選中「中級」時 [Level] 會變成 "中級"', tips: ['同一組要用完全相同的變數名稱。'] },
+            webview: { title: 'WebView（內嵌網頁）', desc: '在畫面裡嵌入一個網頁，等同一個小型瀏覽器視窗，只在「預覽」或匯出後的成品裡才會真正載入，編輯畫布上只顯示網址標籤。新增時已內建範例網址。', example: '文字內容（網址）：\nhttps://example.com', tips: ['對方網站若設定禁止被嵌入（例如多數銀行、社群網站），會顯示空白，這是該網站的安全限制，並非本工具的問題。', '請務必使用 https:// 開頭的網址。'] },
+            dropdown: { title: '下拉選單', desc: '文字內容用逗號或換行分隔多個選項，選取結果會寫入 Bound Variable。', example: '文字內容：\nOption 1,Option 2,Option 3\n變數欄位填：[Choice]', tips: [] }
+        };
+        function showElementHelp(type) {
+            const h = ELEMENT_HELP[type]; if (!h) return;
+            _helpType = type;
+            document.getElementById('help-title').lastChild ? null : null;
+            document.getElementById('help-title').innerHTML = `<i class="fa-solid fa-circle-question text-brand-600"></i> ${h.title}`;
+            document.getElementById('help-desc').innerText = h.desc;
+            document.getElementById('help-example').innerText = h.example;
+            const tw = document.getElementById('help-tips-wrap'), tl = document.getElementById('help-tips');
+            if (h.tips && h.tips.length) { tl.innerHTML = h.tips.map(t => `<li>${esc(t)}</li>`).join(''); tw.classList.remove('hidden'); }
+            else tw.classList.add('hidden');
+            document.getElementById('dlg-help').showModal();
+        }
+        let _helpType = null;
+        function insertHelpExample() {
+            if (_helpType) addNewElement(_helpType);
+            document.getElementById('dlg-help').close();
+        }
+        function placeholderSVG(label) {
+            return 'data:image/svg+xml;utf8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180"><rect width="100%" height="100%" fill="#e2e8f0"/><g fill="none" stroke="#94a3b8" stroke-width="2"><rect x="20" y="20" width="200" height="140" rx="6"/><circle cx="70" cy="70" r="16"/><path d="M20 145 L85 95 L130 130 L165 90 L220 140"/></g><text x="50%" y="168" font-family="sans-serif" font-size="12" fill="#64748b" text-anchor="middle">${label}</text></svg>`);
+        }
+        function ensurePlaceholder(id) {
+            const key = 'placeholder_' + id + '.svg';
+            (project.assets ||= {})[key.toLowerCase()] = placeholderSVG('點兩下更換圖片');
+            return key;
+        }
         function addNewElement(type) {
             const page = getCurrentPage();
             const id = uid('elem');
@@ -781,7 +923,7 @@
                 y: 40 + (page.elements.length * 10),
                 w: type === 'button' ? 120 : (type === 'image' ? 200 : 160),
                 h: type === 'button' ? 40 : (type === 'image' ? 150 : 36),
-                text: type === 'button' ? 'Click Me' : (type === 'text' ? 'Sample Text' : ''),
+                text: ELEMENT_DEFAULT_TEXT[type] ?? '',
                 variable: '',
                 fontSize: 14,
                 color: '#1e293b',
@@ -790,12 +932,22 @@
                 script: '',
                 zIndex: page.elements.length + 1
             };
+            if (type === 'image') newElem.text = ensurePlaceholder(id);
 
             page.elements.push(newElem);
             selectElement(id);
             renderCanvas();
         }
 
+        function openElementPropsPopup() {
+            switchRightTab('props');
+            updatePropertiesPanel();
+            document.getElementById('elem-props-slot').appendChild(document.getElementById('tab-content-props'));
+            document.getElementById('dlg-elem-props').showModal();
+        }
+        document.getElementById('dlg-elem-props').addEventListener('close', () => {
+            document.getElementById('panel-right').insertBefore(document.getElementById('tab-content-props'), document.getElementById('tab-content-vars'));
+        });
         function selectElement(id) {
             selectedElementId = id;
             renderCanvas();
@@ -980,6 +1132,18 @@
             document.getElementById('prop-name').value = elem.name || '';
             document.getElementById('prop-text').value = elem.text || '';
             document.getElementById('prop-variable').value = elem.variable || '';
+
+            const isImg = elem.type === 'image', isBtn = elem.type === 'button';
+            document.getElementById('prop-image-container').classList.toggle('hidden', !isImg);
+            document.getElementById('prop-text-container').classList.toggle('hidden', isImg);
+            document.getElementById('prop-text-label').innerText = isBtn ? '按鈕文字' : 'Text Content / Value';
+            document.getElementById('prop-icon-container').classList.toggle('hidden', !isBtn);
+            if (isImg) document.getElementById('prop-image-preview').src = assetUrl(elem.text) || placeholderSVG('尚無圖片');
+            if (isBtn) {
+                const p = document.getElementById('prop-icon-preview'), u = assetUrl(elem.img || '');
+                p.src = u; p.classList.toggle('hidden', !u);
+            }
+            document.getElementById('prop-script-btn-label').innerText = isBtn ? '設定這個按鈕要做什麼' : 'Edit NeoScript Actions';
             document.getElementById('prop-x').value = elem.x;
             document.getElementById('prop-y').value = elem.y;
             document.getElementById('prop-w').value = elem.w;
@@ -990,6 +1154,24 @@
             document.getElementById('prop-align').value = elem.align || 'left';
         }
 
+        function fileToDataUrl(file) { return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(file); }); }
+        async function handleImageUpload(file, slot) {
+            if (!file || !selectedElementId) return;
+            const page = getCurrentPage(), elem = page.elements.find(e => e.id === selectedElementId);
+            if (!elem) return;
+            const dataUrl = await fileToDataUrl(file);
+            const key = `upload_${elem.id}_${slot || 'main'}_${Date.now().toString(36)}.png`;
+            (project.assets ||= {})[key.toLowerCase()] = dataUrl;
+            if (slot === 'img') elem.img = key; else elem.text = key;
+            renderCanvas(); updatePropertiesPanel();
+        }
+        function clearImageProp(slot) {
+            if (!selectedElementId) return;
+            const page = getCurrentPage(), elem = page.elements.find(e => e.id === selectedElementId);
+            if (!elem) return;
+            if (slot === 'img') elem.img = ''; else elem.text = ensurePlaceholder(elem.id);
+            renderCanvas(); updatePropertiesPanel();
+        }
         function updateSelectedElementProp(prop, value) {
             if (!selectedElementId) return;
             const page = getCurrentPage();
@@ -1047,9 +1229,10 @@
             const elem = page.elements.find(e => e.id === selectedElementId);
             activeScriptTarget = { type: 'element', id: elem.id };
 
-            document.getElementById('script-modal-title').innerText = `NeoScript: ${elem.name}`;
+            document.getElementById('script-modal-title').innerText = elem.type === 'button' ? `按鈕功能設定：${elem.name}` : `NeoScript 腳本：${elem.name}`;
             document.getElementById('script-code-input').value = elem.script || '';
             document.getElementById('modal-script-editor').classList.remove('hidden');
+            document.getElementById('script-code-input').focus();
         }
 
         function openScriptEditorForCurrentPage() {
@@ -1067,17 +1250,48 @@
 
         function insertScriptCommand(cmd) {
             const input = document.getElementById('script-code-input');
-            let template = '';
+            const page = getCurrentPage();
+            const target = activeScriptTarget.type === 'element' ? page.elements.find(e => e.id === activeScriptTarget.id) : null;
+            const objNames = page.elements.filter(e => !target || e.id !== target.id).map(e => e.name);
+            const pageNames = project.pages.map(p => p.name);
+            const ask = (msg, def) => window.prompt(msg, def ?? '');
+            let line = null;
             switch (cmd) {
-                case 'GotoPage': template = 'GotoPage "Page 1"\n'; break;
-                case 'SetVar': template = 'SetVar "[Score]" "100"\n'; break;
-                case 'Alert': template = 'Alert "Hello NeoBook World!"\n'; break;
-                case 'ShowObject': template = 'ShowObject "elem_1"\n'; break;
-                case 'HideObject': template = 'HideObject "elem_1"\n'; break;
-                case 'PlayAudio': template = 'PlayAudio "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"\n'; break;
-                case 'If': template = 'If "[Score]" "=" "100"\n  Alert "Winner!"\nEndIf\n'; break;
+                case 'GotoPage': { const v = ask(`要跳到哪一頁？\n可用頁面：${pageNames.join('、') || '（無其他頁面）'}`, pageNames[0] || ''); if (v) line = `GotoPage "${v}"`; break; }
+                case 'GotoNextPage': line = 'GotoNextPage'; break;
+                case 'GotoPrevPage': line = 'GotoPrevPage'; break;
+                case 'ShowObject': case 'HideObject': case 'FocusObject': {
+                    const v = ask(`要對哪個物件操作？\n本頁物件：${objNames.join('、') || '（本頁沒有其他物件）'}`, objNames[0] || ''); if (v) line = `${cmd} "${v}"`; break;
+                }
+                case 'SetObjectFill': {
+                    const n = ask(`要改變哪個物件的顏色？\n本頁物件：${objNames.join('、') || '（本頁沒有其他物件）'}`, objNames[0] || ''); if (!n) break;
+                    const c = ask('要換成什麼顏色？（可輸入色名如 Red，或 #RRGGBB）', 'Red'); if (c != null) line = `SetObjectFill "${n}" "${c}" "Solid" "False"`; break;
+                }
+                case 'MoveObject': {
+                    const n = ask(`要移動哪個物件？\n本頁物件：${objNames.join('、') || '（本頁沒有其他物件）'}`, objNames[0] || ''); if (!n) break;
+                    const x = ask('移到 X 座標？', '0'); if (x == null) break;
+                    const y = ask('移到 Y 座標？', '0'); if (y != null) line = `MoveObject "${n}" "${x}" "${y}"`; break;
+                }
+                case 'SetVar': {
+                    const varNames = Object.keys(project.variables);
+                    const n = ask(`要設定哪個變數？（含中括號，例如 [Score]）\n已建立的變數：${varNames.join('、') || '（尚無變數）'}`, varNames[0] || '[Var]'); if (!n) break;
+                    const v = ask(`把「${n}」設成什麼值？`, ''); if (v != null) line = `SetVar "${n}" "${v}"`; break;
+                }
+                case 'Math': {
+                    const varNames = Object.keys(project.variables);
+                    const e = ask(`要計算的算式，可用 [變數]，例如 [Score]+1：`, varNames[0] ? `${varNames[0]}+1` : ''); if (!e) break;
+                    const v = ask('計算結果要存到哪個變數？', varNames[0] || '[Result]'); if (v != null) line = `Math "${e}" "0" "${v}"`; break;
+                }
+                case 'Alert': { const v = ask('要顯示的訊息文字：', 'Hello!'); if (v != null) line = `Alert "${v}"`; break; }
+                case 'PlayAudio': { const v = ask('聲音檔的網址：', 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3'); if (v) line = `PlayAudio "${v}"`; break; }
+                case 'OpenURL': { const v = ask('要開啟的網址：', 'https://'); if (v) line = `OpenURL "${v}"`; break; }
+                case 'Delay': { const v = ask('要延遲幾毫秒？（1000 = 1 秒）', '1000'); if (v) line = `Delay "${v}"`; break; }
+                case 'HttpGet': { const u = ask('要讀取的網址：', 'https://'); if (!u) break; const v = ask('抓到的內容要存到哪個變數？', '[Result]'); if (v) line = `HttpGet "${u}" "${v}"`; break; }
+                case 'Call': { const v = ask('要呼叫哪個 Function 名稱？（需先用 Function...EndFunction 定義）', ''); if (v) line = `Call "${v}"`; break; }
+                case 'Exit': { const v = ask('離開前要顯示確認訊息嗎？（留空則直接離開）', ''); line = v ? `Exit "" "${v}"` : 'Exit "" ""'; break; }
+                case 'If': line = 'If "[Var]" "=" "value"\n  Alert "Winner!"\nEndIf'; break;
             }
-            input.value += template;
+            if (line) input.value += (input.value && !input.value.endsWith('\n') ? '\n' : '') + line + '\n';
         }
 
         function saveScriptCode() {
@@ -1099,6 +1313,51 @@
             const q = CSS.escape(n);
             return document.querySelector(`#player-viewport [data-name="${q}"], #player-viewport [data-id="${q}"]`);
         }
+        /* ===== PWA support (installable manifest + icons + best-effort service worker) ===== */
+        function makeAppIcon(letter, bg, size) {
+            const c = document.createElement('canvas'); c.width = c.height = size;
+            const ctx = c.getContext('2d');
+            const r = size * 0.22;
+            ctx.fillStyle = bg;
+            ctx.beginPath();
+            ctx.moveTo(r, 0); ctx.arcTo(size, 0, size, size, r); ctx.arcTo(size, size, 0, size, r); ctx.arcTo(0, size, 0, 0, r); ctx.arcTo(0, 0, size, 0, r);
+            ctx.closePath(); ctx.fill();
+            ctx.fillStyle = '#ffffff'; ctx.font = `bold ${Math.round(size * 0.52)}px system-ui, sans-serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText((letter || 'N').toUpperCase().slice(0, 1), size / 2, size * 0.56);
+            return c.toDataURL('image/png');
+        }
+        function manifestHref(manifest) { return 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(manifest)); }
+        function buildManifest(name, color, icon192, icon512) {
+            return { name, short_name: name.slice(0, 12), start_url: location.href.split('#')[0].split('?')[0], scope: location.href.split('#')[0].split('?')[0], display: 'standalone', orientation: 'any', background_color: '#0b1220', theme_color: color, icons: [{ src: icon192, sizes: '192x192', type: 'image/png' }, { src: icon512, sizes: '512x512', type: 'image/png' }] };
+        }
+        function installAppHead(doc, name, color) {
+            const icon192 = makeAppIcon(name, color, 192), icon512 = makeAppIcon(name, color, 512);
+            const add = (tag, attrs) => { const el = doc.createElement(tag); Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v)); doc.head.appendChild(el); return el; };
+            add('link', { rel: 'manifest', href: manifestHref(buildManifest(name, color, icon192, icon512)) });
+            add('link', { rel: 'apple-touch-icon', href: icon192 });
+            add('link', { rel: 'icon', href: icon192 });
+            add('meta', { name: 'apple-mobile-web-app-capable', content: 'yes' });
+            add('meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' });
+            add('meta', { name: 'apple-mobile-web-app-title', content: name.slice(0, 12) });
+            add('meta', { name: 'mobile-web-app-capable', content: 'yes' });
+            add('meta', { name: 'theme-color', content: color });
+            try {
+                const swCode = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>self.clients.claim());self.addEventListener('fetch',e=>{});";
+                if ('serviceWorker' in navigator) navigator.serviceWorker.register(URL.createObjectURL(new Blob([swCode], { type: 'text/javascript' }))).catch(() => {});
+            } catch (e) {}
+        }
+        let _deferredPWA = null;
+        window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); _deferredPWA = e; });
+        function installPWA() {
+            if (_deferredPWA) { _deferredPWA.prompt(); _deferredPWA.userChoice.finally(() => { _deferredPWA = null; }); return; }
+            const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            alert(ios
+                ? '在 Safari 底部（或分享列）按「分享」圖示 ⬆️，選擇「加入主畫面」，即可像 App 一樣從桌面開啟。'
+                : '瀏覽器可能未偵測到可安裝狀態，或已經安裝過。可試著點瀏覽器網址列右側的安裝圖示，或打開瀏覽器選單選擇「安裝應用程式 / 新增至主畫面」。');
+        }
+        installAppHead(document, 'NeoStudio', '#0f766e');
+
         function mkPlugins() {
             return { actions: {}, controls: {}, register(p) {
                 for (const [k, f] of Object.entries(p.actions || {})) this.actions[k.toLowerCase()] = f;
@@ -1347,10 +1606,16 @@
             return { project: { title: H.Title || 'NeoBook Import', width: +H.ScreenWidth || 800, height: +H.ScreenHeight || 600, pages, variables }, badTypes: [...badTypes], badCmds: [...badCmds], refs: [...refs] };
         }
 
-        async function importProject(event) {
-            const files = [...event.target.files]; event.target.value = '';
+        async function importProjectFiles(fileList) {
+            const files = [...fileList];
+            document.getElementById('file-input-import').value = '';
+            document.getElementById('file-input-import-folder').value = '';
             const isImg = f => /^image\//.test(f.type) || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(f.name);
-            const main = files.find(f => !isImg(f)), assets = {};
+            const isMain = f => /\.(pub|json)$/i.test(f.name);
+            const mains = files.filter(isMain);
+            if (files.length && !mains.length && !files.some(isImg)) { alert('這個資料夾裡沒有找到 .pub 或 .json 專案檔。'); return; }
+            const main = mains.length > 1 ? mains.sort((a, b) => a.name.length - b.name.length)[0] : mains[0];
+            const assets = {};
             for (const f of files.filter(isImg)) assets[f.name.toLowerCase()] = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); });
             try {
                 let note = '', refs = [];
@@ -1366,22 +1631,27 @@
                     p.pages.forEach((pg, i) => { pg.id = pg.id || uid('page'); pg.name = pg.name || 'Page ' + (i + 1); pg.elements = pg.elements || []; });
                     project = p; activePageId = p.pages[0].id; selectedElementId = null;
                     (project.plugins || []).forEach(loadPlugin);
-                }
+                } else if (!Object.keys(assets).length) { return; }
                 project.assets = Object.assign(project.assets || {}, assets);
                 const miss = refs.filter(n => !project.assets[n.toLowerCase()]);
-                if (miss.length) note += `\n缺少圖檔（請重新匯入時和 .pub 一起多選）：${miss.join(', ')}`;
+                if (miss.length) note += `\n缺少圖檔（請改用「選擇整個資料夾匯入」，或和 .pub 一起多選這些檔案）：${miss.join(', ')}`;
+                else if (mains.length > 1) note += `\n資料夾裡有多個專案檔，已匯入：${main.name}`;
                 renderPagesList(); renderCanvas(); renderVariablesList(); updatePropertiesPanel(); fitZoom();
                 if (note) alert(note);
             } catch (err) { alert("Invalid NeoBook Project File."); }
         }
 
         function exportStandaloneHTML() {
-            const rt = [mkPlugins, coreActions, numExpr, assetUrl, esc, getFlexJustify, subVars, neoApi, refreshTpl, findRuntimeEl, executeNeoScript, runSwitchToPage].map(f => f.toString()).join('\n');
+            const rt = [mkPlugins, coreActions, numExpr, assetUrl, esc, getFlexJustify, subVars, neoApi, refreshTpl, findRuntimeEl, executeNeoScript, runSwitchToPage, makeAppIcon, manifestHref, buildManifest, installAppHead].map(f => f.toString()).join('\n');
+            const appColor = '#0284c7';
             const js = `const project = ${JSON.stringify(project).replace(/</g, '\\u003c')};\n${rt}\n` +
                 `var NeoPlugins=mkPlugins();NeoPlugins.register({actions:coreActions()});\n${(project.plugins || []).map(c => `try{(function(NeoPlugins){${c.replace(/<\//g, '<\\/')}})(NeoPlugins)}catch(e){}`).join('\n')}\n` +
+                `installAppHead(document, ${JSON.stringify(project.title || 'App')}, ${JSON.stringify(appColor)});\n` +
+                `var _deferredPWA=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_deferredPWA=e;document.getElementById('pwa-install-btn').style.display='flex';});\n` +
+                `function installPWA(){if(_deferredPWA){_deferredPWA.prompt();_deferredPWA.userChoice.finally(()=>{_deferredPWA=null});return}var ios=/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);alert(ios?'在 Safari 按「分享」圖示，選擇「加入主畫面」即可安裝。':'請點瀏覽器網址列的安裝圖示，或用選單的「安裝應用程式／新增至主畫面」。')}\n` +
                 `(function(){const vp=document.getElementById('player-viewport');const fit=()=>{vp.style.transform='scale('+Math.min(1,(innerWidth-16)/project.width,(innerHeight-16)/project.height)+')'};addEventListener('resize',fit);fit();runSwitchToPage(project.pages[0].id)})();`;
             const html = `<!DOCTYPE html>
-<html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html lang="zh-TW"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>${esc(project.title)}</title>
 <script src="https://cdn.tailwindcss.com"><\/script>
 <script>tailwind.config={theme:{extend:{colors:{brand:{50:'#f0f9ff',100:'#e0f2fe',500:'#0284c7',600:'#0369a1',700:'#075985'}}}}}<\/script>
@@ -1389,6 +1659,7 @@
 </head>
 <body class="bg-gray-900 h-screen w-screen flex items-center justify-center m-0 overflow-hidden">
 <div id="player-viewport" class="relative bg-white shadow-2xl overflow-hidden" style="width:${project.width}px;height:${project.height}px"></div>
+<button id="pwa-install-btn" onclick="installPWA()" style="display:none" class="fixed bottom-4 right-4 z-50 items-center gap-2 px-4 py-2 rounded-full bg-brand-600 text-white text-sm font-medium shadow-lg hover:bg-brand-700">⬇ 安裝為 App</button>
 <script>${js}<\/script>
 </body></html>`;
             const a = document.createElement('a');
